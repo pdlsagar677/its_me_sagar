@@ -7,6 +7,7 @@ export interface BlogPost {
   slug: string;
   content: string;
   excerpt: string;
+  description: string;
   coverImage?: string;
   category: string;
   tags: string[];
@@ -18,8 +19,6 @@ export interface BlogPost {
   likes: number;
   comments: number;
   readingTime: number;
-  seoTitle?: string;
-  seoDescription?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,40 +39,29 @@ export interface Project {
   updatedAt: Date;
 }
 
-export interface DashboardStats {
-  totalPosts: number;
-  publishedPosts: number;
-  draftPosts: number;
-  featuredPosts: number;
-  totalViews: number;
-  totalLikes: number;
-  totalComments: number;
-  totalProjects: number;
-  activeProjects: number;
-  completedProjects: number;
-  portfolioVisits: number;
-  averageEngagement: number;
-}
-
 interface AdminState {
   // State
   posts: BlogPost[];
   projects: Project[];
   isLoading: boolean;
   error: string | null;
-  stats: DashboardStats;
-  recentActivity: any[];
   
   // Post Management
   fetchAllPosts: () => Promise<void>;
-  fetchPostsByStatus: (status: 'published' | 'draft' | 'featured') => Promise<void>;
   fetchPostById: (postId: string) => Promise<BlogPost | null>;
-  createPost: (postData: Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt' | 'views' | 'likes' | 'comments'>) => Promise<BlogPost>;
-  updatePost: (postId: string, updates: Partial<BlogPost>) => Promise<BlogPost>;
+  createPost: (postData: {
+    title: string;
+    description: string;
+    content: string;
+    excerpt?: string;
+    image?: File;
+    category: string;
+    tags: string[];
+    isPublished: boolean;
+    isFeatured: boolean;
+  }) => Promise<BlogPost>;
+  updatePost: (postId: string, updates: Partial<BlogPost> & { image?: File }) => Promise<BlogPost>;
   deletePost: (postId: string) => Promise<void>;
-  publishPost: (postId: string) => Promise<void>;
-  unpublishPost: (postId: string) => Promise<void>;
-  toggleFeatured: (postId: string) => Promise<void>;
   
   // Project Management
   fetchAllProjects: () => Promise<void>;
@@ -81,33 +69,12 @@ interface AdminState {
   createProject: (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Project>;
   updateProject: (projectId: string, updates: Partial<Project>) => Promise<Project>;
   deleteProject: (projectId: string) => Promise<void>;
-  toggleProjectFeatured: (projectId: string) => Promise<void>;
-  
-  // Analytics
-  fetchStats: () => Promise<void>;
-  fetchRecentActivity: () => Promise<void>;
-  updatePortfolioVisits: () => Promise<void>;
   
   // Utility
   clearError: () => void;
   generateSlug: (title: string) => string;
   calculateReadingTime: (content: string) => number;
 }
-
-const defaultStats: DashboardStats = {
-  totalPosts: 0,
-  publishedPosts: 0,
-  draftPosts: 0,
-  featuredPosts: 0,
-  totalViews: 0,
-  totalLikes: 0,
-  totalComments: 0,
-  totalProjects: 0,
-  activeProjects: 0,
-  completedProjects: 0,
-  portfolioVisits: 0,
-  averageEngagement: 0,
-};
 
 export const useAdminStore = create<AdminState>()(
   persist(
@@ -117,37 +84,12 @@ export const useAdminStore = create<AdminState>()(
       projects: [],
       isLoading: false,
       error: null,
-      stats: defaultStats,
-      recentActivity: [],
 
       // Post Management
       fetchAllPosts: async () => {
         set({ isLoading: true, error: null });
         try {
           const response = await fetch('/api/admin/posts', {
-            credentials: 'include'
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to fetch posts');
-          }
-          
-          const data = await response.json();
-          set({ posts: data.posts, isLoading: false });
-        } catch (error) {
-          console.error('Fetch posts error:', error);
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to fetch posts',
-            isLoading: false 
-          });
-        }
-      },
-
-      fetchPostsByStatus: async (status) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await fetch(`/api/admin/posts?status=${status}`, {
             credentials: 'include'
           });
           
@@ -198,23 +140,27 @@ export const useAdminStore = create<AdminState>()(
           // Generate slug and reading time
           const slug = get().generateSlug(postData.title);
           const readingTime = get().calculateReadingTime(postData.content);
+          const excerpt = postData.excerpt || postData.description.substring(0, 150) + '...';
+
+          // Create FormData for file upload
+          const formData = new FormData();
+          formData.append('title', postData.title);
+          formData.append('description', postData.description);
+          formData.append('content', postData.content);
+          formData.append('excerpt', excerpt);
+          formData.append('category', postData.category);
+          formData.append('tags', postData.tags.join(','));
+          formData.append('isPublished', postData.isPublished.toString());
+          formData.append('isFeatured', postData.isFeatured.toString());
+          formData.append('slug', slug);
+          formData.append('readingTime', readingTime.toString());
           
-          const postWithMetadata = {
-            ...postData,
-            slug,
-            readingTime,
-            views: 0,
-            likes: 0,
-            comments: 0,
-          };
+          if (postData.image) formData.append('image', postData.image);
 
           const response = await fetch('/api/admin/posts', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
             credentials: 'include',
-            body: JSON.stringify(postWithMetadata),
+            body: formData,
           });
           
           if (!response.ok) {
@@ -231,10 +177,6 @@ export const useAdminStore = create<AdminState>()(
             isLoading: false 
           });
           
-          // Update stats
-          get().fetchStats();
-          get().fetchRecentActivity();
-          
           return data.post;
         } catch (error) {
           console.error('Create post error:', error);
@@ -246,26 +188,43 @@ export const useAdminStore = create<AdminState>()(
         }
       },
 
-      updatePost: async (postId: string, updates: Partial<BlogPost>) => {
+      updatePost: async (postId: string, updates: Partial<BlogPost> & { image?: File }) => {
         set({ isLoading: true, error: null });
         try {
+          const formData = new FormData();
+          
+          // Add text fields to formData
+          Object.entries(updates).forEach(([key, value]) => {
+            if (key !== 'image' && value !== undefined) {
+              if (key === 'tags' && Array.isArray(value)) {
+                formData.append(key, value.join(','));
+              } else {
+                formData.append(key, String(value));
+              }
+            }
+          });
+          
+          // Handle image upload
+          if (updates.image) {
+            formData.append('image', updates.image);
+          }
+          
           // If title is updated, generate new slug
           if (updates.title) {
-            updates.slug = get().generateSlug(updates.title);
+            const slug = get().generateSlug(updates.title);
+            formData.append('slug', slug);
           }
           
           // If content is updated, calculate new reading time
           if (updates.content) {
-            updates.readingTime = get().calculateReadingTime(updates.content);
+            const readingTime = get().calculateReadingTime(updates.content);
+            formData.append('readingTime', readingTime.toString());
           }
 
           const response = await fetch(`/api/admin/posts/${postId}`, {
             method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
             credentials: 'include',
-            body: JSON.stringify(updates),
+            body: formData,
           });
           
           if (!response.ok) {
@@ -282,7 +241,6 @@ export const useAdminStore = create<AdminState>()(
           );
           
           set({ posts: updatedPosts, isLoading: false });
-          get().fetchRecentActivity();
           
           return data.post;
         } catch (error) {
@@ -313,121 +271,10 @@ export const useAdminStore = create<AdminState>()(
           const updatedPosts = posts.filter(post => post.id !== postId);
           
           set({ posts: updatedPosts, isLoading: false });
-          
-          // Update stats
-          get().fetchStats();
-          get().fetchRecentActivity();
         } catch (error) {
           console.error('Delete post error:', error);
           set({ 
             error: error instanceof Error ? error.message : 'Failed to delete post',
-            isLoading: false 
-          });
-          throw error;
-        }
-      },
-
-      publishPost: async (postId: string) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await fetch(`/api/admin/posts/${postId}/publish`, {
-            method: 'PUT',
-            credentials: 'include',
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to publish post');
-          }
-          
-          const data = await response.json();
-          
-          // Update local state
-          const { posts } = get();
-          const updatedPosts = posts.map(post => 
-            post.id === postId ? { ...post, isPublished: true, updatedAt: new Date() } : post
-          );
-          
-          set({ posts: updatedPosts, isLoading: false });
-          get().fetchStats();
-          get().fetchRecentActivity();
-        } catch (error) {
-          console.error('Publish post error:', error);
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to publish post',
-            isLoading: false 
-          });
-          throw error;
-        }
-      },
-
-      unpublishPost: async (postId: string) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await fetch(`/api/admin/posts/${postId}/unpublish`, {
-            method: 'PUT',
-            credentials: 'include',
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to unpublish post');
-          }
-          
-          const data = await response.json();
-          
-          // Update local state
-          const { posts } = get();
-          const updatedPosts = posts.map(post => 
-            post.id === postId ? { ...post, isPublished: false, updatedAt: new Date() } : post
-          );
-          
-          set({ posts: updatedPosts, isLoading: false });
-          get().fetchStats();
-        } catch (error) {
-          console.error('Unpublish post error:', error);
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to unpublish post',
-            isLoading: false 
-          });
-          throw error;
-        }
-      },
-
-      toggleFeatured: async (postId: string) => {
-        set({ isLoading: true, error: null });
-        try {
-          const post = get().posts.find(p => p.id === postId);
-          if (!post) throw new Error('Post not found');
-
-          const response = await fetch(`/api/admin/posts/${postId}/featured`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify({ featured: !post.isFeatured }),
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to toggle featured status');
-          }
-          
-          const data = await response.json();
-          
-          // Update local state
-          const { posts } = get();
-          const updatedPosts = posts.map(post => 
-            post.id === postId ? { ...post, isFeatured: !post.isFeatured, updatedAt: new Date() } : post
-          );
-          
-          set({ posts: updatedPosts, isLoading: false });
-          get().fetchStats();
-        } catch (error) {
-          console.error('Toggle featured error:', error);
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to toggle featured status',
             isLoading: false 
           });
           throw error;
@@ -507,10 +354,6 @@ export const useAdminStore = create<AdminState>()(
             isLoading: false 
           });
           
-          // Update stats
-          get().fetchStats();
-          get().fetchRecentActivity();
-          
           return data.project;
         } catch (error) {
           console.error('Create project error:', error);
@@ -548,7 +391,6 @@ export const useAdminStore = create<AdminState>()(
           );
           
           set({ projects: updatedProjects, isLoading: false });
-          get().fetchRecentActivity();
           
           return data.project;
         } catch (error) {
@@ -579,10 +421,6 @@ export const useAdminStore = create<AdminState>()(
           const updatedProjects = projects.filter(project => project.id !== projectId);
           
           set({ projects: updatedProjects, isLoading: false });
-          
-          // Update stats
-          get().fetchStats();
-          get().fetchRecentActivity();
         } catch (error) {
           console.error('Delete project error:', error);
           set({ 
@@ -590,104 +428,6 @@ export const useAdminStore = create<AdminState>()(
             isLoading: false 
           });
           throw error;
-        }
-      },
-
-      toggleProjectFeatured: async (projectId: string) => {
-        set({ isLoading: true, error: null });
-        try {
-          const project = get().projects.find(p => p.id === projectId);
-          if (!project) throw new Error('Project not found');
-
-          const response = await fetch(`/api/admin/projects/${projectId}/featured`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify({ featured: !project.isFeatured }),
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to toggle featured status');
-          }
-          
-          const data = await response.json();
-          
-          // Update local state
-          const { projects } = get();
-          const updatedProjects = projects.map(project => 
-            project.id === projectId ? { ...project, isFeatured: !project.isFeatured, updatedAt: new Date() } : project
-          );
-          
-          set({ projects: updatedProjects, isLoading: false });
-          get().fetchStats();
-        } catch (error) {
-          console.error('Toggle project featured error:', error);
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to toggle featured status',
-            isLoading: false 
-          });
-          throw error;
-        }
-      },
-
-      // Analytics
-      fetchStats: async () => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await fetch('/api/admin/stats', {
-            credentials: 'include'
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to fetch stats');
-          }
-          
-          const data = await response.json();
-          set({ stats: data.stats, isLoading: false });
-        } catch (error) {
-          console.error('Fetch stats error:', error);
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to fetch stats',
-            isLoading: false 
-          });
-        }
-      },
-
-      fetchRecentActivity: async () => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await fetch('/api/admin/activity', {
-            credentials: 'include'
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to fetch activity');
-          }
-          
-          const data = await response.json();
-          set({ recentActivity: data.activity, isLoading: false });
-        } catch (error) {
-          console.error('Fetch activity error:', error);
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to fetch activity',
-            isLoading: false 
-          });
-        }
-      },
-
-      updatePortfolioVisits: async () => {
-        try {
-          await fetch('/api/admin/stats/visits', {
-            method: 'POST',
-            credentials: 'include'
-          });
-        } catch (error) {
-          console.error('Update visits error:', error);
         }
       },
 
@@ -715,7 +455,6 @@ export const useAdminStore = create<AdminState>()(
       partialize: (state) => ({
         posts: state.posts,
         projects: state.projects,
-        stats: state.stats,
       }),
     }
   )

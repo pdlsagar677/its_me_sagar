@@ -1,5 +1,5 @@
 "use client";
-
+import Link from 'next/link';
 import React, { useState } from 'react';
 import { 
   Home, 
@@ -17,16 +17,52 @@ const PortfolioNavbar = () => {
   const [activeNav, setActiveNav] = useState('home');
 
   const navItems = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'blog', label: 'Blog', icon: BookOpen },
-    { id: 'service', label: 'Services', icon: Briefcase },
-    { id: 'contact', label: 'Contact', icon: Mail },
-    { id: 'profile', label: 'Profile', icon: User },
+    { 
+      id: 'home', 
+      label: 'Home', 
+      icon: Home, 
+      href: '/' 
+    },
+    { 
+      id: 'blog', 
+      label: 'Blog', 
+      icon: BookOpen, 
+      href: '/blog' 
+    },
+    { 
+      id: 'service', 
+      label: 'Services', 
+      icon: Briefcase, 
+      href: '/services' 
+    },
+    { 
+      id: 'contact', 
+      label: 'Contact', 
+      icon: Mail, 
+      href: '/contact' 
+    },
+    { 
+      id: 'profile', 
+      label: 'Profile', 
+      icon: User, 
+      href: '/profile' 
+    },
   ];
+
+  // Update active nav based on current path
+  React.useEffect(() => {
+    const path = window.location.pathname;
+    const currentNav = navItems.find(item => 
+      item.href === path || 
+      (item.href !== '/' && path.startsWith(item.href))
+    );
+    if (currentNav) {
+      setActiveNav(currentNav.id);
+    }
+  }, []);
 
   return (
     <>
-      {/* Add CSS animations */}
       <style jsx>{`
         @keyframes shimmer {
           0% { background-position: -1000px 0; }
@@ -71,7 +107,7 @@ const PortfolioNavbar = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 md:h-20">
             {/* Logo - Enhanced with more polish */}
-            <div className="flex items-center space-x-3 group cursor-pointer">
+            <Link href="/" className="flex items-center space-x-3 group">
               <div className="relative">
                 <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20 animate-float">
                   <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-gray-900" />
@@ -84,13 +120,14 @@ const PortfolioNavbar = () => {
                 </span>
                 <span className="text-xs text-gray-400 font-medium tracking-wide">Full Stack Engineer</span>
               </div>
-            </div>
+            </Link>
 
-            {/* Desktop Navigation - More refined */}
+            {/* Desktop Navigation - Now using Link instead of button */}
             <div className="hidden md:flex items-center space-x-2 bg-gray-800/40 backdrop-blur-sm rounded-2xl px-2 py-2 border border-gray-700/50">
               {navItems.map((item) => (
-                <button
+                <Link
                   key={item.id}
+                  href={item.href}
                   onClick={() => setActiveNav(item.id)}
                   className={`relative px-4 py-2.5 rounded-xl transition-all duration-300 ${
                     activeNav === item.id 
@@ -105,20 +142,18 @@ const PortfolioNavbar = () => {
                     <span className="font-medium tracking-wide">{item.label}</span>
                   </div>
                   
-                  {/* Active indicator - More subtle */}
+                  {/* Active indicator */}
                   {activeNav === item.id && (
                     <>
                       <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-orange-500 rounded-full blur-sm"></div>
                       <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-6 h-1 bg-gradient-to-r from-orange-500 to-amber-400 rounded-full"></div>
                     </>
                   )}
-                </button>
+                </Link>
               ))}
             </div>
 
-          
-
-            {/* Mobile menu button - Enhanced */}
+            {/* Mobile menu button */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="md:hidden p-2.5 rounded-xl text-gray-300 hover:text-orange-400 hover:bg-gray-800/50 transition-all duration-300 border border-gray-700/50"
@@ -132,13 +167,14 @@ const PortfolioNavbar = () => {
           </div>
         </div>
 
-        {/* Mobile Menu - Enhanced with glass effect */}
+        {/* Mobile Menu - Now using Link instead of button */}
         {isMenuOpen && (
           <div className="md:hidden bg-gradient-to-b from-gray-900/95 to-gray-900 backdrop-blur-lg border-t border-gray-800 animate-slideDown">
             <div className="px-4 py-4 space-y-2">
               {navItems.map((item) => (
-                <button
+                <Link
                   key={item.id}
+                  href={item.href}
                   onClick={() => {
                     setActiveNav(item.id);
                     setIsMenuOpen(false);
@@ -162,10 +198,8 @@ const PortfolioNavbar = () => {
                   {activeNav === item.id && (
                     <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
                   )}
-                </button>
+                </Link>
               ))}
-              
-             
             </div>
           </div>
         )}

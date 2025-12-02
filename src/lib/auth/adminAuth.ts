@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { sessionService, userService } from '@/lib/mongodb/dbService';
+import { sessionService, userService } from '@/lib/mongodb/authService';
 
 export async function verifyAdmin(request: NextRequest) {
   try {

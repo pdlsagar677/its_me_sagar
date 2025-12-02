@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcryptjs from 'bcryptjs';
-import { userService, validateEmail, validatePhoneNumber } from "@/lib/mongodb/dbService";
+import { userService, validateEmail, validatePhoneNumber } from "@/lib/mongodb/authService";
 
 export async function POST(request: NextRequest) {
   try {

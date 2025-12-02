@@ -1,31 +1,31 @@
 "use client";
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/stores/useAuthStore';
-import { 
-  Mail, 
-  Lock, 
-  User, 
-  LogIn, 
-  Eye, 
+import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/stores/useAuthStore";
+import {
+  Mail,
+  Lock,
+  User,
+  LogIn,
+  Eye,
   EyeOff,
   ArrowLeft,
   AlertCircle,
   Sparkles,
   Code2,
   Shield,
-  Home
-} from 'lucide-react';
+  Home,
+} from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, isLoading, error, clearError } = useAuthStore();
-  
+
   const [formData, setFormData] = useState({
-    emailOrUsername: '',
-    password: '',
+    emailOrUsername: "",
+    password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -33,75 +33,74 @@ export default function LoginPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
     // Clear error when user starts typing
     if (formErrors[name]) {
-      setFormErrors(prev => ({ ...prev, [name]: '' }));
+      setFormErrors((prev) => ({ ...prev, [name]: "" }));
     }
     if (error) clearError();
   };
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    
+
     if (!formData.emailOrUsername.trim()) {
-      errors.emailOrUsername = 'Email or username is required';
+      errors.emailOrUsername = "Email or username is required";
     }
-    
+
     if (!formData.password.trim()) {
-      errors.password = 'Password is required';
+      errors.password = "Password is required";
     } else if (formData.password.length < 6) {
-      errors.password = 'Password must be at least 6 characters';
+      errors.password = "Password must be at least 6 characters";
     }
-    
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setRedirecting(true);
-    
+
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(formData),
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
+        throw new Error(data.error || "Login failed");
       }
-      
+
       // Update auth store with user data
       login(data.user);
-      
+
       // Redirect based on user role
       if (data.user.isAdmin) {
         // Admin users go to admin dashboard
         setTimeout(() => {
-          router.push('/admin');
+          router.push("/admin");
           router.refresh();
         }, 500);
       } else {
         // Regular users go to homepage
         setTimeout(() => {
-          router.push('/');
+          router.push("/");
           router.refresh();
         }, 500);
       }
-      
     } catch (error) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
       setFormErrors({
-        submit: error instanceof Error ? error.message : 'Login failed'
+        submit: error instanceof Error ? error.message : "Login failed",
       });
       setRedirecting(false);
     }
@@ -132,7 +131,7 @@ export default function LoginPage() {
         <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-gray-700/50 relative">
           {/* Animated gradient line */}
           <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent animate-shimmer"></div>
-          
+
           {/* Header */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl mb-4 shadow-lg shadow-orange-500/20 animate-float">
@@ -185,9 +184,9 @@ export default function LoginPage() {
                   value={formData.emailOrUsername}
                   onChange={handleChange}
                   className={`block w-full pl-10 pr-3 py-3 bg-gray-700/50 border rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:border-transparent transition-all ${
-                    formErrors.emailOrUsername 
-                      ? 'border-red-500/50 focus:ring-red-500' 
-                      : 'border-gray-600/50 hover:border-orange-500/50 focus:ring-orange-500'
+                    formErrors.emailOrUsername
+                      ? "border-red-500/50 focus:ring-red-500"
+                      : "border-gray-600/50 hover:border-orange-500/50 focus:ring-orange-500"
                   }`}
                   placeholder="Enter your email or username"
                   disabled={isLoading || redirecting}
@@ -223,9 +222,9 @@ export default function LoginPage() {
                   value={formData.password}
                   onChange={handleChange}
                   className={`block w-full pl-10 pr-12 py-3 bg-gray-700/50 border rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:border-transparent transition-all ${
-                    formErrors.password 
-                      ? 'border-red-500/50 focus:ring-red-500' 
-                      : 'border-gray-600/50 hover:border-orange-500/50 focus:ring-orange-500'
+                    formErrors.password
+                      ? "border-red-500/50 focus:ring-red-500"
+                      : "border-gray-600/50 hover:border-orange-500/50 focus:ring-orange-500"
                   }`}
                   placeholder="Enter your password"
                   disabled={isLoading || redirecting}
@@ -261,7 +260,7 @@ export default function LoginPage() {
                 {isLoading || redirecting ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 inline-block"></div>
-                    {redirecting ? 'Redirecting...' : 'Signing in...'}
+                    {redirecting ? "Redirecting..." : "Signing in..."}
                   </>
                 ) : (
                   <>
@@ -283,88 +282,36 @@ export default function LoginPage() {
           {/* Sign Up Link */}
           <div className="text-center">
             <p className="text-gray-400">
-              Don't have an account?{' '}
+              Don't have an account?{" "}
               <Link
                 href="/signup"
                 className="text-orange-400 hover:text-orange-300 font-medium transition-colors group"
               >
                 Create account
-                <span className="inline-block ml-1 group-hover:translate-x-1 transition-transform">→</span>
+                <span className="inline-block ml-1 group-hover:translate-x-1 transition-transform">
+                  →
+                </span>
               </Link>
             </p>
           </div>
 
           {/* Terms */}
           <p className="text-xs text-gray-500 text-center mt-6">
-            By signing in, you agree to our{' '}
-            <Link href="/terms" className="text-orange-400 hover:text-orange-300 hover:underline">
+            By signing in, you agree to our{" "}
+            <Link
+              href="/terms"
+              className="text-orange-400 hover:text-orange-300 hover:underline"
+            >
               Terms
-            </Link>{' '}
-            and{' '}
-            <Link href="/privacy" className="text-orange-400 hover:text-orange-300 hover:underline">
+            </Link>{" "}
+            and{" "}
+            <Link
+              href="/privacy"
+              className="text-orange-400 hover:text-orange-300 hover:underline"
+            >
               Privacy Policy
             </Link>
           </p>
-        </div>
-
-        {/* Demo Credentials */}
-        <div className="mt-8 bg-gradient-to-br from-orange-900/20 to-amber-900/10 border border-orange-700/30 rounded-xl p-4">
-          <h3 className="text-sm font-medium text-orange-300 mb-3 flex items-center">
-            <Shield className="w-4 h-4 mr-2" />
-            Demo Credentials
-          </h3>
-          <div className="space-y-3">
-            <div>
-              <h4 className="text-xs font-medium text-orange-200/80 mb-1 flex items-center">
-                <Sparkles className="w-3 h-3 mr-1" />
-                Admin Account
-              </h4>
-              <div className="text-sm text-orange-200/70 space-y-1 ml-4">
-                <p>Email: admin@sagar.com</p>
-                <p>Username: admin</p>
-                <p>Password: admin123</p>
-                <p className="text-xs text-orange-300/50 mt-1">
-                  ↳ Redirects to Admin Dashboard
-                </p>
-              </div>
-            </div>
-            <div className="pt-3 border-t border-orange-700/30">
-              <h4 className="text-xs font-medium text-orange-200/80 mb-1 flex items-center">
-                <Home className="w-3 h-3 mr-1" />
-                User Account
-              </h4>
-              <div className="text-sm text-orange-200/70 space-y-1 ml-4">
-                <p>Email: user@sagar.com</p>
-                <p>Username: user</p>
-                <p>Password: user123</p>
-                <p className="text-xs text-orange-300/50 mt-1">
-                  ↳ Redirects to Homepage
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Links */}
-        <div className="mt-6 grid grid-cols-2 gap-3">
-          <Link 
-            href="/portfolio" 
-            className="p-3 bg-gray-800/30 hover:bg-gray-700/50 border border-gray-700/50 rounded-xl text-center group transition-all"
-          >
-            <div className="flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-gray-400 group-hover:text-orange-400 mr-2" />
-              <span className="text-gray-300 group-hover:text-white text-sm">Portfolio</span>
-            </div>
-          </Link>
-          <Link 
-            href="/projects" 
-            className="p-3 bg-gray-800/30 hover:bg-gray-700/50 border border-gray-700/50 rounded-xl text-center group transition-all"
-          >
-            <div className="flex items-center justify-center">
-              <Code2 className="w-4 h-4 text-gray-400 group-hover:text-orange-400 mr-2" />
-              <span className="text-gray-300 group-hover:text-white text-sm">Projects</span>
-            </div>
-          </Link>
         </div>
       </div>
     </div>

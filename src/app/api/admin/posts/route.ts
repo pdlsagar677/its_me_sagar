@@ -1,115 +1,118 @@
-import { NextRequest, NextResponse } from "next/server";
-import { verifyAdmin } from "@/lib/auth/adminAuth";
+import { NextRequest, NextResponse } from 'next/server';
+import { postService } from '@/lib/mongodb/postService';
+import { cloudinaryService } from '@/lib/cloudinary/cloudinary';
 
+// Helper to parse FormData
+async function parseFormData(request: NextRequest) {
+  const formData = await request.formData();
+  const entries: Record<string, any> = {};
+  
+  for (const [key, value] of formData.entries()) {
+    if (key === 'tags' && typeof value === 'string') {
+      entries[key] = value.split(',').map(tag => tag.trim()).filter(tag => tag);
+    } else if (key === 'isPublished' || key === 'isFeatured') {
+      entries[key] = value === 'true';
+    } else if (key === 'readingTime') {
+      entries[key] = parseInt(value as string) || 5;
+    } else if (key === 'image') {
+      entries[key] = value; // Keep as File
+    } else {
+      entries[key] = value;
+    }
+  }
+  
+  return entries;
+}
 
-const getMockPosts = () => {
-  return [
-    {
-      id: '1',
-      title: 'Getting Started with Next.js 14',
-      slug: 'getting-started-with-nextjs-14',
-      content: 'Lorem ipsum dolor sit amet...',
-      excerpt: 'Learn how to build modern web applications with Next.js 14',
-      category: 'Web Development',
-      tags: ['Next.js', 'React', 'TypeScript'],
-      isPublished: true,
-      isFeatured: true,
-      authorId: 'admin',
-      authorName: 'Admin',
-      views: 1250,
-      likes: 89,
-      comments: 12,
-      readingTime: 5,
-      createdAt: new Date('2024-01-15'),
-      updatedAt: new Date('2024-01-15'),
-    },
-    {
-      id: '2',
-      title: 'Mastering Tailwind CSS',
-      slug: 'mastering-tailwind-css',
-      content: 'Lorem ipsum dolor sit amet...',
-      excerpt: 'A comprehensive guide to Tailwind CSS utilities',
-      category: 'CSS',
-      tags: ['Tailwind', 'CSS', 'Design'],
-      isPublished: true,
-      isFeatured: false,
-      authorId: 'admin',
-      authorName: 'Admin',
-      views: 890,
-      likes: 45,
-      comments: 8,
-      readingTime: 8,
-      createdAt: new Date('2024-01-10'),
-      updatedAt: new Date('2024-01-10'),
-    },
-  ];
-};
-
+// GET all posts or by status
 export async function GET(request: NextRequest) {
   try {
-    // Verify admin access
-    const admin = await verifyAdmin(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
-    
-    let posts = getMockPosts();
-    
-    if (status === 'published') {
-      posts = posts.filter(post => post.isPublished);
-    } else if (status === 'draft') {
-      posts = posts.filter(post => !post.isPublished);
-    } else if (status === 'featured') {
-      posts = posts.filter(post => post.isFeatured);
+    const status = searchParams.get('status') as 'published' | 'draft' | 'featured' | null;
+
+    let posts;
+    if (status) {
+      posts = await postService.getPostsByStatus(status);
+    } else {
+      posts = await postService.getAllPosts();
     }
 
-    return NextResponse.json({ posts }, { status: 200 });
-    
+    return NextResponse.json({ posts });
   } catch (error) {
-    console.error("Get posts error:", error);
+    console.error('GET posts error:', error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: 'Failed to fetch posts' },
       { status: 500 }
     );
   }
 }
 
+// CREATE new post with image upload
 export async function POST(request: NextRequest) {
   try {
-    // Verify admin access
-    const admin = await verifyAdmin(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const formData = await parseFormData(request);
+    
+    // Validate required fields
+    if (!formData.title || !formData.content) {
+      return NextResponse.json(
+        { error: 'Title and content are required' },
+        { status: 400 }
+      );
     }
 
-    const postData = await request.json();
-    
-    const newPost = {
-      ...postData,
-      id: `post_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      authorId: admin.id,
-      authorName: admin.username,
-      views: 0,
-      likes: 0,
-      comments: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    // Generate slug if not provided
+    const slug = formData.slug || formData.title
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/--+/g, '-')
+      .trim();
+
+    // Handle image upload to Cloudinary
+    let coverImageUrl: string | undefined;
+    if (formData.image && formData.image instanceof File) {
+      const buffer = Buffer.from(await formData.image.arrayBuffer());
+      const uploadResult = await cloudinaryService.uploadImage(buffer, 'blog-posts');
+      coverImageUrl = uploadResult.url;
+    }
+
+    // Calculate reading time if not provided
+    const readingTime = formData.readingTime || 
+      Math.ceil((formData.content as string).split(/\s+/).length / 200) || 5;
+
+    // Create post data
+    const postData = {
+      title: formData.title as string,
+      content: formData.content as string,
+      excerpt: (formData.excerpt as string) || 
+               (formData.content as string).substring(0, 150) + '...',
+      coverImage: coverImageUrl,
+      category: (formData.category as string) || 'General',
+      tags: (formData.tags as string[]) || [],
+      isPublished: Boolean(formData.isPublished),
+      isFeatured: Boolean(formData.isFeatured),
+      authorId: formData.authorId as string || 'admin',
+      authorName: formData.authorName as string || 'Admin',
+      readingTime,
+      slug,
+      seoTitle: formData.seoTitle as string,
+      seoDescription: formData.seoDescription as string,
     };
 
-    // In a real app, save to database:
-    // const { db } = await connectToDatabase();
-    // const result = await db.collection(POSTS_COLLECTION).insertOne(newPost);
-    // newPost._id = result.insertedId;
+    const result = await postService.createPost(postData);
 
-    return NextResponse.json({ post: newPost }, { status: 201 });
-    
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ post: result.post }, { status: 201 });
   } catch (error) {
-    console.error("Create post error:", error);
+    console.error('POST posts error:', error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: 'Failed to create post' },
       { status: 500 }
     );
   }

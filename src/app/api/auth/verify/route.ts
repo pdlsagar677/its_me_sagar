@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sessionService, userService } from "@/lib/mongodb/dbService";
+import { sessionService, userService } from "@/lib/mongodb/authService";
 
 export async function GET(request: NextRequest) {
   try {

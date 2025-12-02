@@ -486,38 +486,7 @@ export default function SignupPage() {
           </div>
         </div>
 
-        {/* Benefits Section */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-700/30 backdrop-blur-sm rounded-xl p-4 border border-gray-700/50 text-center hover:border-orange-500/50 transition-all group">
-            <div className="w-12 h-12 bg-gradient-to-br from-orange-500/20 to-amber-500/10 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-              <Code2 className="w-6 h-6 text-orange-400" />
-            </div>
-            <h4 className="font-medium text-white">Full Stack Projects</h4>
-            <p className="text-sm text-gray-400 mt-1">
-              Access SAGAR's portfolio projects
-            </p>
-          </div>
-          
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-700/30 backdrop-blur-sm rounded-xl p-4 border border-gray-700/50 text-center hover:border-orange-500/50 transition-all group">
-            <div className="w-12 h-12 bg-gradient-to-br from-orange-500/20 to-amber-500/10 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-              <Sparkles className="w-6 h-6 text-amber-400" />
-            </div>
-            <h4 className="font-medium text-white">Premium Content</h4>
-            <p className="text-sm text-gray-400 mt-1">
-              Exclusive tutorials and resources
-            </p>
-          </div>
-          
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-700/30 backdrop-blur-sm rounded-xl p-4 border border-gray-700/50 text-center hover:border-orange-500/50 transition-all group">
-            <div className="w-12 h-12 bg-gradient-to-br from-orange-500/20 to-amber-500/10 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-              <Rocket className="w-6 h-6 text-orange-300" />
-            </div>
-            <h4 className="font-medium text-white">Fast Performance</h4>
-            <p className="text-sm text-gray-400 mt-1">
-              Optimized for the best experience
-            </p>
-          </div>
-        </div>
+       
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sessionService, userService, verifyPassword } from "@/lib/mongodb/dbService";
+import { sessionService, userService, verifyPassword } from "@/lib/mongodb/authService";
 
 export async function DELETE(request: NextRequest) {
   try {
