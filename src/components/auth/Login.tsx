@@ -15,7 +15,8 @@ import {
   AlertCircle,
   Sparkles,
   Code2,
-  Key
+  Shield,
+  Home
 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -28,6 +29,7 @@ export default function LoginPage() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [redirecting, setRedirecting] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -62,6 +64,8 @@ export default function LoginPage() {
     
     if (!validateForm()) return;
     
+    setRedirecting(true);
+    
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -76,14 +80,30 @@ export default function LoginPage() {
         throw new Error(data.error || 'Login failed');
       }
       
+      // Update auth store with user data
       login(data.user);
-      router.push('/dashboard');
-      router.refresh();
+      
+      // Redirect based on user role
+      if (data.user.isAdmin) {
+        // Admin users go to admin dashboard
+        setTimeout(() => {
+          router.push('/admin');
+          router.refresh();
+        }, 500);
+      } else {
+        // Regular users go to homepage
+        setTimeout(() => {
+          router.push('/');
+          router.refresh();
+        }, 500);
+      }
+      
     } catch (error) {
       console.error('Login error:', error);
       setFormErrors({
         submit: error instanceof Error ? error.message : 'Login failed'
       });
+      setRedirecting(false);
     }
   };
 
@@ -126,8 +146,20 @@ export default function LoginPage() {
             </p>
           </div>
 
+          {/* Redirecting Message */}
+          {redirecting && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-blue-900/30 to-blue-800/20 border border-blue-700/50 rounded-xl flex items-center justify-center animate-slideDown">
+              <div className="flex items-center">
+                <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mr-3"></div>
+                <span className="text-blue-300">
+                  Logging in and redirecting...
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Error Message */}
-          {(error || formErrors.submit) && (
+          {(error || formErrors.submit) && !redirecting && (
             <div className="mb-6 p-4 bg-gradient-to-r from-red-900/30 to-red-800/20 border border-red-700/50 rounded-xl flex items-start animate-slideDown">
               <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 mr-3 flex-shrink-0" />
               <span className="text-red-300 text-sm">
@@ -158,10 +190,10 @@ export default function LoginPage() {
                       : 'border-gray-600/50 hover:border-orange-500/50 focus:ring-orange-500'
                   }`}
                   placeholder="Enter your email or username"
-                  disabled={isLoading}
+                  disabled={isLoading || redirecting}
                 />
               </div>
-              {formErrors.emailOrUsername && (
+              {formErrors.emailOrUsername && !redirecting && (
                 <p className="mt-2 text-sm text-red-400">
                   {formErrors.emailOrUsername}
                 </p>
@@ -196,12 +228,13 @@ export default function LoginPage() {
                       : 'border-gray-600/50 hover:border-orange-500/50 focus:ring-orange-500'
                   }`}
                   placeholder="Enter your password"
-                  disabled={isLoading}
+                  disabled={isLoading || redirecting}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-orange-400 transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-orange-400 transition-colors disabled:opacity-50"
+                  disabled={isLoading || redirecting}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5 text-gray-400" />
@@ -210,7 +243,7 @@ export default function LoginPage() {
                   )}
                 </button>
               </div>
-              {formErrors.password && (
+              {formErrors.password && !redirecting && (
                 <p className="mt-2 text-sm text-red-400">
                   {formErrors.password}
                 </p>
@@ -220,15 +253,15 @@ export default function LoginPage() {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || redirecting}
               className="w-full group relative bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-medium py-3 px-4 rounded-xl transition-all duration-300 transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity blur-md"></div>
               <span className="relative">
-                {isLoading ? (
+                {isLoading || redirecting ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 inline-block"></div>
-                    Signing in...
+                    {redirecting ? 'Redirecting...' : 'Signing in...'}
                   </>
                 ) : (
                   <>
@@ -274,7 +307,44 @@ export default function LoginPage() {
           </p>
         </div>
 
-      
+        {/* Demo Credentials */}
+        <div className="mt-8 bg-gradient-to-br from-orange-900/20 to-amber-900/10 border border-orange-700/30 rounded-xl p-4">
+          <h3 className="text-sm font-medium text-orange-300 mb-3 flex items-center">
+            <Shield className="w-4 h-4 mr-2" />
+            Demo Credentials
+          </h3>
+          <div className="space-y-3">
+            <div>
+              <h4 className="text-xs font-medium text-orange-200/80 mb-1 flex items-center">
+                <Sparkles className="w-3 h-3 mr-1" />
+                Admin Account
+              </h4>
+              <div className="text-sm text-orange-200/70 space-y-1 ml-4">
+                <p>Email: admin@sagar.com</p>
+                <p>Username: admin</p>
+                <p>Password: admin123</p>
+                <p className="text-xs text-orange-300/50 mt-1">
+                  ↳ Redirects to Admin Dashboard
+                </p>
+              </div>
+            </div>
+            <div className="pt-3 border-t border-orange-700/30">
+              <h4 className="text-xs font-medium text-orange-200/80 mb-1 flex items-center">
+                <Home className="w-3 h-3 mr-1" />
+                User Account
+              </h4>
+              <div className="text-sm text-orange-200/70 space-y-1 ml-4">
+                <p>Email: user@sagar.com</p>
+                <p>Username: user</p>
+                <p>Password: user123</p>
+                <p className="text-xs text-orange-300/50 mt-1">
+                  ↳ Redirects to Homepage
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Quick Links */}
         <div className="mt-6 grid grid-cols-2 gap-3">
           <Link 
