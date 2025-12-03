@@ -16,7 +16,10 @@ import {
   Filter,
   ArrowUpRight,
   BookOpen,
-  Heart
+  Heart,
+  Check,
+  X,
+  ExternalLink
 } from 'lucide-react';
 import { useAdminStore } from '@/stores/useAdminStore';
 
@@ -31,10 +34,32 @@ export default function PostsPage() {
   } = useAdminStore();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
+  const [showCreateSuccess, setShowCreateSuccess] = useState(false);
+  const [deletedPostTitle, setDeletedPostTitle] = useState('');
 
   useEffect(() => {
     fetchAllPosts();
   }, [fetchAllPosts]);
+
+  // Auto-hide success messages
+  useEffect(() => {
+    if (showDeleteSuccess) {
+      const timer = setTimeout(() => {
+        setShowDeleteSuccess(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showDeleteSuccess]);
+
+  useEffect(() => {
+    if (showCreateSuccess) {
+      const timer = setTimeout(() => {
+        setShowCreateSuccess(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showCreateSuccess]);
 
   const handleCreatePost = () => {
     router.push('/admin/create-post');
@@ -44,17 +69,17 @@ export default function PostsPage() {
     router.push(`/admin/posts/edit/${id}`);
   };
 
-const handleViewLive = (id: string) => {
-  router.push(`/blog/${id}`);
-};
-  const handleDeletePost = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this post?')) {
-      try {
-        await deletePost(id);
-      } catch (error) {
-        console.error('Error deleting post:', error);
-        alert('Failed to delete post');
-      }
+  const handleViewLive = (id: string) => {
+    router.push(`/blog/${id}`);
+  };
+
+  const handleDeletePost = async (postId: string, postTitle: string) => {
+    try {
+      await deletePost(postId);
+      setDeletedPostTitle(postTitle);
+      setShowDeleteSuccess(true);
+    } catch (error) {
+      console.error('Error deleting post:', error);
     }
   };
 
@@ -92,6 +117,63 @@ const handleViewLive = (id: string) => {
 
   return (
     <div className="space-y-6">
+      {/* Success Notifications */}
+      {showDeleteSuccess && (
+        <div className="fixed top-6 right-6 z-50 animate-slide-in">
+          <div className="bg-gradient-to-r from-red-900/20 to-red-800/10 backdrop-blur-sm border border-red-700/30 rounded-xl p-4 shadow-2xl max-w-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-red-500/20 rounded-lg border border-red-500/30">
+                  <Check className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-white">Post deleted</p>
+                  <p className="text-red-300 text-sm mt-0.5">"{deletedPostTitle}" has been removed</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDeleteSuccess(false)}
+                className="p-2 text-red-300 hover:text-red-200 hover:bg-red-500/20 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Progress bar */}
+            <div className="w-full h-1 bg-red-500/20 rounded-full overflow-hidden mt-3">
+              <div className="h-full bg-red-500 animate-progress-bar"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateSuccess && (
+        <div className="fixed top-6 right-6 z-50 animate-slide-in">
+          <div className="bg-gradient-to-r from-green-900/20 to-emerald-800/10 backdrop-blur-sm border border-green-700/30 rounded-xl p-4 shadow-2xl max-w-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-500/20 rounded-lg border border-green-500/30">
+                  <Check className="w-5 h-5 text-green-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-white">Post created</p>
+                  <p className="text-green-300 text-sm mt-0.5">New post published successfully</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCreateSuccess(false)}
+                className="p-2 text-green-300 hover:text-green-200 hover:bg-green-500/20 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Progress bar */}
+            <div className="w-full h-1 bg-green-500/20 rounded-full overflow-hidden mt-3">
+              <div className="h-full bg-green-500 animate-progress-bar"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -139,8 +221,12 @@ const handleViewLive = (id: string) => {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-900/20 border border-red-700/50 text-red-300 px-4 py-3 rounded-xl">
-          <strong>Error:</strong> {error}
+        <div className="bg-gradient-to-r from-red-900/20 to-red-800/10 border border-red-700/30 text-red-300 px-6 py-4 rounded-xl backdrop-blur-sm">
+          <div className="flex items-center gap-2">
+            <X className="w-5 h-5" />
+            <strong className="font-medium">Error</strong>
+          </div>
+          <p className="text-sm mt-1">{error}</p>
         </div>
       )}
 
@@ -179,7 +265,7 @@ const handleViewLive = (id: string) => {
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => handleDeletePost(post.id)}
+                    onClick={() => handleDeletePost(post.id, post.title)}
                     className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-600/30 rounded-lg transition-colors"
                     title="Delete post"
                   >
@@ -298,6 +384,37 @@ const handleViewLive = (id: string) => {
           </div>
         </div>
       )}
+
+      {/* Add CSS for animations */}
+      <style jsx>{`
+        @keyframes slide-in {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        
+        @keyframes progress-bar {
+          from {
+            width: 100%;
+          }
+          to {
+            width: 0%;
+          }
+        }
+        
+        .animate-slide-in {
+          animation: slide-in 0.3s ease-out;
+        }
+        
+        .animate-progress-bar {
+          animation: progress-bar 5s linear forwards;
+        }
+      `}</style>
     </div>
   );
 }

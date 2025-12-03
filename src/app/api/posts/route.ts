@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { postService } from '@/lib/mongodb/postService';
 
+// GET - Get all posts with filters
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -77,6 +78,78 @@ export async function GET(request: NextRequest) {
     console.error('GET posts error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch posts' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST - Create new post
+export async function POST(request: NextRequest) {
+  try {
+    const formData = await request.formData();
+    
+    // Get form data
+    const title = formData.get('title') as string;
+    const description = formData.get('description') as string;
+    const content = formData.get('content') as string;
+    const excerpt = formData.get('excerpt') as string || description.substring(0, 150) + '...';
+    const category = formData.get('category') as string || 'General';
+    const tags = (formData.get('tags') as string)?.split(',') || [];
+    const isPublished = formData.get('isPublished') === 'true';
+    const isFeatured = formData.get('isFeatured') === 'true';
+    const authorId = formData.get('authorId') as string || 'admin';
+    const authorName = formData.get('authorName') as string || 'Admin';
+    const image = formData.get('image') as File | null;
+    
+    // Validate required fields
+    if (!title || !description || !content) {
+      return NextResponse.json(
+        { error: 'Title, description, and content are required' },
+        { status: 400 }
+      );
+    }
+    
+    // Handle image upload if provided
+    let imageUrl = '';
+    if (image) {
+      // Here you would upload the image to your storage (Cloudinary, S3, etc.)
+      // For now, we'll use a placeholder
+      // imageUrl = await uploadImage(image);
+    }
+    
+    // Create post data
+    const postData = {
+      title,
+      description,
+      content,
+      excerpt,
+      coverImage: imageUrl,
+      category,
+      tags,
+      isPublished,
+      isFeatured,
+      authorId,
+      authorName,
+    };
+    
+    const result = await postService.createPost(postData);
+    
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error || 'Failed to create post' },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json({
+      success: true,
+      post: result.post
+    }, { status: 201 });
+    
+  } catch (error) {
+    console.error('POST create error:', error);
+    return NextResponse.json(
+      { error: 'Failed to create post' },
       { status: 500 }
     );
   }

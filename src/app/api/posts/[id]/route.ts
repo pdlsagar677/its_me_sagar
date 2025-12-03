@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { postService } from '@/lib/mongodb/postService';
 
+// GET - Get single post by ID
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -12,7 +13,6 @@ export async function GET(
     console.log('🔍 API: Fetching post with ID:', id);
     
     if (!id) {
-      console.log('❌ API: No ID provided');
       return NextResponse.json(
         { error: 'Post ID is required' },
         { status: 400 }
@@ -22,27 +22,19 @@ export async function GET(
     const post = await postService.getPostById(id);
     
     if (!post) {
-      console.log('❌ API: Post not found in database for ID:', id);
-      
-      // Let's check what posts are actually in the database
-      const allPosts = await postService.getAllPosts();
-      console.log('📊 API: Total posts in DB:', allPosts.length);
-      console.log('📊 API: Available post IDs:', allPosts.map(p => p.id));
-      
       return NextResponse.json(
         { error: 'Post not found' },
         { status: 404 }
       );
     }
     
-    console.log('✅ API: Post found:', {
-      id: post.id,
-      title: post.title,
-      isPublished: post.isPublished,
-      category: post.category
-    });
-
-    console.log('✅ API: Returning post data');
+    // Only return if published
+    if (!post.isPublished) {
+      return NextResponse.json(
+        { error: 'Post not found' },
+        { status: 404 }
+      );
+    }
     
     // Increment views
     try {
@@ -50,7 +42,7 @@ export async function GET(
         views: (post.views || 0) + 1
       });
     } catch (error) {
-      console.error('⚠️ API: Error incrementing views:', error);
+      console.error('Error incrementing views:', error);
     }
     
     // Get related posts (by category)
@@ -66,9 +58,138 @@ export async function GET(
       relatedPosts
     });
   } catch (error) {
-    console.error('❌ API: GET post by ID error:', error);
+    console.error('GET post by ID error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch post' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - Update post
+export async function PUT(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const params = await context.params;
+    const { id } = params;
+    
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Post ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const formData = await request.formData();
+    
+    // Get form data
+    const title = formData.get('title') as string;
+    const description = formData.get('description') as string;
+    const content = formData.get('content') as string;
+    const category = formData.get('category') as string || 'General';
+    const tags = (formData.get('tags') as string)?.split(',') || [];
+    const isPublished = formData.get('isPublished') === 'true';
+    const isFeatured = formData.get('isFeatured') === 'true';
+    const image = formData.get('image') as File | null;
+    
+    // Find existing post
+    const existingPost = await postService.getPostById(id);
+    if (!existingPost) {
+      return NextResponse.json(
+        { error: 'Post not found' },
+        { status: 404 }
+      );
+    }
+    
+    // Prepare update data
+    const updateData: any = {
+      title,
+      description,
+      content,
+      category,
+      tags,
+      isPublished,
+      isFeatured,
+      updatedAt: new Date()
+    };
+    
+    // Handle image upload if new image provided
+    let imageUrl = existingPost.coverImage;
+    if (image) {
+      // Here you would upload the image to your storage (Cloudinary, S3, etc.)
+      // For now, we'll keep the existing image URL
+      // imageUrl = await uploadImage(image);
+    }
+    
+    if (imageUrl) {
+      updateData.coverImage = imageUrl;
+    }
+    
+    // Calculate reading time
+    const wordCount = content.trim().split(/\s+/).length;
+    const readingTime = Math.ceil(wordCount / 200) || 1;
+    updateData.readingTime = readingTime;
+    
+    // Update post
+    const result = await postService.updatePost(id, updateData);
+    
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error || 'Failed to update post' },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json({
+      success: true,
+      post: result.post
+    });
+    
+  } catch (error) {
+    console.error('PUT post error:', error);
+    return NextResponse.json(
+      { error: 'Failed to update post' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - Delete post
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const params = await context.params;
+    const { id } = params;
+    
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Post ID is required' },
+        { status: 400 }
+      );
+    }
+    
+    const result = await postService.deletePost(id);
+    
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error || 'Failed to delete post' },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Post deleted successfully'
+    });
+    
+  } catch (error) {
+    console.error('DELETE post error:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete post' },
       { status: 500 }
     );
   }

@@ -17,26 +17,53 @@ import {
   PenTool,
   Layout,
   Type,
+  Save,
+  Eye,
+  Calendar,
+  User,
+  ArrowLeft,
+  CheckCircle,
+  AlertCircle,
+  TrendingUp,
   Check,
   ExternalLink
 } from 'lucide-react';
 
-export default function CreatePostForm() {
+interface EditPostFormProps {
+  postId: string;
+}
+
+export default function EditPostForm({ postId }: EditPostFormProps) {
   const router = useRouter();
-  const { createPost, isLoading, error, clearError } = useAdminStore();
+  const { 
+    fetchPostById, 
+    updatePost, 
+    isLoading, 
+    error, 
+    clearError 
+  } = useAdminStore();
+  
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     content: '',
     category: 'Technology',
     tags: [] as string[],
-    readingTime: '',
+    isPublished: true,
+    isFeatured: false,
   });
+  
   const [tagInput, setTagInput] = useState('');
   const [image, setImage] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string>('');
+  const [existingImage, setExistingImage] = useState<string>('');
+  const [loading, setLoading] = useState(true);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [createdPostId, setCreatedPostId] = useState<string>('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  useEffect(() => {
+    loadPostData();
+  }, [postId]);
 
   useEffect(() => {
     if (showSuccess) {
@@ -47,9 +74,41 @@ export default function CreatePostForm() {
     }
   }, [showSuccess]);
 
+  const loadPostData = async () => {
+    try {
+      setLoading(true);
+      const post = await fetchPostById(postId);
+      
+      if (post) {
+        setFormData({
+          title: post.title || '',
+          description: post.description || '',
+          content: post.content || '',
+          category: post.category || 'Technology',
+          tags: post.tags || [],
+          isPublished: post.isPublished || true,
+          isFeatured: post.isFeatured || false,
+        });
+        
+        if (post.coverImage) {
+          setExistingImage(post.coverImage);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading post:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setFormData(prev => ({ ...prev, [name]: checked }));
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,6 +128,7 @@ export default function CreatePostForm() {
   const removeImage = () => {
     setImage(null);
     setPreviewImage('');
+    setExistingImage('');
   };
 
   const handleAddTag = () => {
@@ -100,95 +160,70 @@ export default function CreatePostForm() {
     clearError();
 
     try {
-      const newPost = await createPost({
+      await updatePost(postId, {
         ...formData,
-        isPublished: true,
-        isFeatured: false,
-        excerpt: formData.description.substring(0, 150) + '...',
         image: image || undefined,
       });
 
-      if (newPost?.id) {
-        setCreatedPostId(newPost.id);
-        setShowSuccess(true);
-        
-        // Reset form
-        setFormData({
-          title: '',
-          description: '',
-          content: '',
-          category: 'Technology',
-          tags: [],
-          readingTime: '',
-        });
-        setTagInput('');
-        setImage(null);
-        setPreviewImage('');
-      }
+      setSuccessMessage('Post updated successfully!');
+      setShowSuccess(true);
+      
     } catch (error) {
-      console.error('Error creating post:', error);
+      console.error('Error updating post:', error);
     }
   };
 
-  const handleViewPost = () => {
-    if (createdPostId) {
-      router.push(`/blog/${createdPostId}`);
-    }
+  const handleViewLive = () => {
+    router.push(`/blog/${postId}`);
   };
 
-  const handleEditPost = () => {
-    if (createdPostId) {
-      router.push(`/admin/posts/edit/${createdPostId}`);
-    }
+  const handleViewInList = () => {
+    router.push('/admin/posts');
   };
 
-  const handleCreateAnother = () => {
-    setShowSuccess(false);
-    setCreatedPostId('');
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+          <p className="mt-4 text-gray-400">Loading post data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Success Notification */}
+      {/* Success Notification - Toggle Style */}
       {showSuccess && (
         <div className="fixed top-6 right-6 z-50 animate-slide-in">
-          <div className="bg-gradient-to-r from-green-900/20 to-emerald-800/10 backdrop-blur-sm border border-green-700/30 rounded-xl p-4 shadow-2xl max-w-sm">
+          <div className="bg-gradient-to-r from-green-900/20 to-emerald-800/10 backdrop-blur-sm border border-green-700/30 rounded-xl p-4 shadow-2xl">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-green-500/20 rounded-lg border border-green-500/30">
                   <Check className="w-5 h-5 text-green-400" />
                 </div>
                 <div>
-                  <p className="font-medium text-white">Post Published!</p>
-                  <p className="text-green-300 text-sm mt-0.5">Your article is now live</p>
+                  <p className="font-medium text-white">{successMessage}</p>
+                  <p className="text-green-300 text-sm mt-0.5">Changes saved and published</p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowSuccess(false)}
-                className="p-2 text-green-300 hover:text-green-200 hover:bg-green-500/20 rounded-lg transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleViewLive}
+                  className="p-2 text-green-300 hover:text-green-200 hover:bg-green-500/20 rounded-lg transition-colors"
+                  title="View live"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setShowSuccess(false)}
+                  className="p-2 text-green-300 hover:text-green-200 hover:bg-green-500/20 rounded-lg transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-            
-            {/* Action Buttons */}
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={handleViewPost}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 text-green-300 rounded-lg transition-colors text-sm"
-              >
-                <ExternalLink className="w-3 h-3" />
-                View Live
-              </button>
-              <button
-                onClick={handleEditPost}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-300 rounded-lg transition-colors text-sm"
-              >
-                <PenTool className="w-3 h-3" />
-                Edit
-              </button>
-            </div>
-            
             {/* Progress bar */}
             <div className="w-full h-1 bg-green-500/20 rounded-full overflow-hidden mt-3">
               <div className="h-full bg-green-500 animate-progress-bar"></div>
@@ -197,37 +232,84 @@ export default function CreatePostForm() {
         </div>
       )}
 
-      {/* Header */}
+      {/* Header with Post Preview */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-800/50 to-gray-700/30 backdrop-blur-sm border border-gray-700/50 p-8">
         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-500/10 to-amber-500/5 rounded-full -translate-y-16 translate-x-16" />
         <div className="relative">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-gradient-to-r from-orange-500/20 to-amber-500/10 rounded-xl border border-orange-500/20">
-              <PenTool className="w-6 h-6 text-orange-400" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-gradient-to-r from-orange-500/20 to-amber-500/10 rounded-xl border border-orange-500/20">
+                <PenTool className="w-6 h-6 text-orange-400" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-white">Edit Post</h1>
+                <p className="text-gray-400 mt-1">Update and refine your article</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Create New Post</h1>
-              <p className="text-gray-400 mt-1">Craft an amazing article for your readers</p>
+            
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => router.push('/admin/posts')}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-gray-700/50 to-gray-600/30 border border-gray-600/50 text-gray-300 rounded-xl hover:from-gray-600/50 hover:to-gray-500/30 hover:text-white transition-all"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Posts
+              </button>
+              <button
+                type="button"
+                onClick={handleViewLive}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500/20 to-cyan-500/10 border border-blue-500/30 text-blue-300 rounded-xl hover:from-blue-500/30 hover:to-cyan-500/20 hover:text-blue-200 transition-all"
+              >
+                <Eye className="w-4 h-4" />
+                View Live
+              </button>
             </div>
           </div>
           
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[
-              { label: 'Auto Published', value: 'Instant', icon: Globe, color: 'from-green-500 to-emerald-500' },
-              { label: 'Reading Time', value: 'Auto Calculated', icon: Clock, color: 'from-blue-500 to-cyan-500' },
-              { label: 'SEO Optimized', value: 'Built-in', icon: Sparkles, color: 'from-purple-500 to-pink-500' },
+              { 
+                label: 'Status', 
+                value: formData.isPublished ? 'Published' : 'Draft', 
+                icon: Globe, 
+                color: formData.isPublished ? 'from-green-500 to-emerald-500' : 'from-yellow-500 to-amber-500',
+                subtext: formData.isPublished ? 'Live on site' : 'Not visible'
+              },
+              { 
+                label: 'Category', 
+                value: formData.category, 
+                icon: BookOpen, 
+                color: 'from-blue-500 to-cyan-500',
+                subtext: 'Primary category'
+              },
+              { 
+                label: 'Featured', 
+                value: formData.isFeatured ? 'Yes' : 'No', 
+                icon: TrendingUp, 
+                color: formData.isFeatured ? 'from-purple-500 to-pink-500' : 'from-gray-500 to-gray-600',
+                subtext: formData.isFeatured ? 'Featured post' : 'Regular post'
+              },
+              { 
+                label: 'Last Updated', 
+                value: 'Just now', 
+                icon: Calendar, 
+                color: 'from-orange-500 to-amber-500',
+                subtext: 'Auto-saved'
+              },
             ].map((stat, index) => (
               <div key={index} className="bg-gradient-to-br from-gray-800/40 to-gray-700/20 backdrop-blur-sm rounded-xl p-4 border border-gray-700/30">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between mb-2">
                   <div className={`p-2 bg-gradient-to-r ${stat.color}/20 rounded-lg border ${stat.color}/30`}>
                     <stat.icon className="w-4 h-4" />
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-400">{stat.label}</p>
-                    <p className="text-white font-medium">{stat.value}</p>
-                  </div>
+                  <span className="text-xs px-2 py-1 rounded-full bg-gray-700/50 text-gray-300">
+                    {stat.label}
+                  </span>
                 </div>
+                <p className="text-white font-bold text-lg">{stat.value}</p>
+                <p className="text-gray-400 text-sm mt-1">{stat.subtext}</p>
               </div>
             ))}
           </div>
@@ -237,13 +319,11 @@ export default function CreatePostForm() {
       {/* Error Message */}
       {error && (
         <div className="bg-gradient-to-r from-red-900/20 to-red-800/10 border border-red-700/30 text-red-300 px-6 py-4 rounded-xl backdrop-blur-sm">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="p-1.5 bg-red-500/20 rounded-lg">
-              <X className="w-4 h-4" />
-            </div>
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5" />
             <strong className="font-medium">Error</strong>
           </div>
-          <p className="text-sm">{error}</p>
+          <p className="text-sm mt-1">{error}</p>
         </div>
       )}
 
@@ -254,11 +334,16 @@ export default function CreatePostForm() {
           <div className="lg:col-span-2 space-y-8">
             {/* Title Card */}
             <div className="bg-gradient-to-br from-gray-800/50 to-gray-700/30 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-gradient-to-r from-orange-500/20 to-amber-500/10 rounded-lg border border-orange-500/20">
-                  <Type className="w-5 h-5 text-orange-400" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-r from-orange-500/20 to-amber-500/10 rounded-lg border border-orange-500/20">
+                    <Type className="w-5 h-5 text-orange-400" />
+                  </div>
+                  <h2 className="text-xl font-bold text-white">Post Title</h2>
                 </div>
-                <h2 className="text-xl font-bold text-white">Post Title</h2>
+                <div className="text-sm text-gray-400">
+                  {formData.title.split(' ').filter(w => w.length > 0).length} words
+                </div>
               </div>
               <input
                 type="text"
@@ -267,20 +352,22 @@ export default function CreatePostForm() {
                 onChange={handleInputChange}
                 required
                 className="w-full px-4 py-4 bg-gray-800/30 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg font-medium"
-                placeholder="Enter a compelling title..."
+                placeholder="Enter post title..."
               />
-              <p className="text-gray-400 text-sm mt-3">
-                <span className="text-orange-400 font-medium">Tip:</span> Keep it clear, descriptive, and engaging
-              </p>
             </div>
 
             {/* Description Card */}
             <div className="bg-gradient-to-br from-gray-800/50 to-gray-700/30 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-gradient-to-r from-blue-500/20 to-cyan-500/10 rounded-lg border border-blue-500/20">
-                  <FileText className="w-5 h-5 text-blue-400" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-r from-blue-500/20 to-cyan-500/10 rounded-lg border border-blue-500/20">
+                    <FileText className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <h2 className="text-xl font-bold text-white">Description</h2>
                 </div>
-                <h2 className="text-xl font-bold text-white">Description</h2>
+                <div className="text-sm text-gray-400">
+                  {formData.description.length}/300
+                </div>
               </div>
               <textarea
                 name="description"
@@ -289,14 +376,11 @@ export default function CreatePostForm() {
                 required
                 rows={4}
                 className="w-full px-4 py-4 bg-gray-800/30 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
-                placeholder="Write a brief description that will appear in previews..."
+                placeholder="Brief description of the post..."
               />
-              <div className="flex justify-between items-center mt-3">
-                <p className="text-gray-400 text-sm">
-                  <span className="text-blue-400 font-medium">SEO:</span> This appears in search results
-                </p>
-                <span className="text-sm text-gray-500">{formData.description.length}/300</span>
-              </div>
+              <p className="text-gray-400 text-sm mt-3">
+                <span className="text-blue-400 font-medium">SEO:</span> This appears in search results and social media previews
+              </p>
             </div>
 
             {/* Content Card */}
@@ -309,7 +393,7 @@ export default function CreatePostForm() {
                   <h2 className="text-xl font-bold text-white">Content</h2>
                 </div>
                 <div className="text-sm text-gray-400">
-                  {formData.content.split(/\s+/).filter(word => word.length > 0).length} words
+                  {formData.content.split(/\s+/).filter(w => w.length > 0).length} words
                 </div>
               </div>
               <textarea
@@ -317,15 +401,15 @@ export default function CreatePostForm() {
                 value={formData.content}
                 onChange={handleInputChange}
                 required
-                rows={12}
+                rows={16}
                 className="w-full px-4 py-4 bg-gray-800/30 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono text-sm leading-relaxed resize-none"
-                placeholder="Write your amazing content here... You can use Markdown formatting."
+                placeholder="Write your post content here..."
               />
               <div className="flex justify-between items-center mt-3">
                 <p className="text-gray-400 text-sm">
-                  <span className="text-purple-400 font-medium">Format:</span> Supports Markdown
+                  <span className="text-purple-400 font-medium">Tip:</span> Use clear formatting for better readability
                 </p>
-                <span className="text-sm text-gray-500">{formData.content.length}/10000</span>
+                <span className="text-sm text-gray-500">{formData.content.length}/20000</span>
               </div>
             </div>
           </div>
@@ -341,12 +425,12 @@ export default function CreatePostForm() {
                 <h2 className="text-xl font-bold text-white">Cover Image</h2>
               </div>
               
-              {previewImage ? (
+              {(previewImage || existingImage) ? (
                 <div className="space-y-4">
                   <div className="relative rounded-xl overflow-hidden border border-gray-600/50">
                     <img
-                      src={previewImage}
-                      alt="Preview"
+                      src={previewImage || existingImage}
+                      alt="Cover preview"
                       className="w-full h-48 object-cover"
                     />
                     <div className="absolute top-3 right-3">
@@ -359,9 +443,18 @@ export default function CreatePostForm() {
                       </button>
                     </div>
                   </div>
-                  <p className="text-emerald-400 text-sm text-center">
-                    ✓ Image ready for upload
-                  </p>
+                  <div className="text-center">
+                    <label className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-gray-700/50 to-gray-600/30 border border-gray-600/50 text-gray-300 rounded-lg cursor-pointer hover:from-gray-600/50 hover:to-gray-500/30 hover:text-white transition-all">
+                      <Upload className="w-4 h-4" />
+                      Change Image
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
                 </div>
               ) : (
                 <div className="border-2 border-dashed border-gray-600/50 rounded-xl p-6 text-center hover:border-gray-500/50 transition-colors group cursor-pointer">
@@ -370,7 +463,7 @@ export default function CreatePostForm() {
                       <Upload className="w-8 h-8 text-gray-500 group-hover:text-gray-400" />
                     </div>
                   </div>
-                  <p className="text-gray-400 mb-2">Drag & drop or click to upload</p>
+                  <p className="text-gray-400 mb-2">Upload cover image</p>
                   <p className="text-gray-500 text-sm mb-4">Recommended: 1200×630px</p>
                   <label className="inline-flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-gray-700/50 to-gray-600/30 border border-gray-600/50 text-gray-300 rounded-lg cursor-pointer hover:from-gray-600/50 hover:to-gray-500/30 hover:text-white transition-all">
                     <ImageIcon className="w-4 h-4 mr-2" />
@@ -386,13 +479,13 @@ export default function CreatePostForm() {
               )}
             </div>
 
-            {/* Category & Tags Card */}
+            {/* Settings Card */}
             <div className="bg-gradient-to-br from-gray-800/50 to-gray-700/30 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50">
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 bg-gradient-to-r from-amber-500/20 to-yellow-500/10 rounded-lg border border-amber-500/20">
                   <Layout className="w-5 h-5 text-amber-400" />
                 </div>
-                <h2 className="text-xl font-bold text-white">Categories & Tags</h2>
+                <h2 className="text-xl font-bold text-white">Post Settings</h2>
               </div>
 
               {/* Category */}
@@ -415,7 +508,7 @@ export default function CreatePostForm() {
               </div>
 
               {/* Tags */}
-              <div>
+              <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-300 mb-2">Tags</label>
                 <div className="flex gap-2 mb-3">
                   <input
@@ -456,10 +549,57 @@ export default function CreatePostForm() {
                     ))}
                   </div>
                 )}
-                
-                <p className="text-gray-400 text-sm mt-3">
-                  <span className="text-amber-400 font-medium">Tip:</span> Add relevant tags for better discoverability
-                </p>
+              </div>
+
+              {/* Toggle Settings */}
+              <div className="space-y-4">
+                <label className="flex items-center justify-between p-3 bg-gray-800/20 rounded-xl border border-gray-700/30 cursor-pointer hover:bg-gray-800/30 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${formData.isPublished ? 'bg-green-500/20 border border-green-500/30' : 'bg-gray-700/50 border border-gray-600/50'}`}>
+                      <Globe className={`w-4 h-4 ${formData.isPublished ? 'text-green-400' : 'text-gray-400'}`} />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">Published</p>
+                      <p className="text-gray-400 text-sm">Make post visible to everyone</p>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      name="isPublished"
+                      checked={formData.isPublished}
+                      onChange={handleCheckboxChange}
+                      className="sr-only"
+                    />
+                    <div className={`w-12 h-6 rounded-full transition-colors ${formData.isPublished ? 'bg-green-500' : 'bg-gray-600'}`}>
+                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${formData.isPublished ? 'translate-x-7' : 'translate-x-1'}`} />
+                    </div>
+                  </div>
+                </label>
+
+                <label className="flex items-center justify-between p-3 bg-gray-800/20 rounded-xl border border-gray-700/30 cursor-pointer hover:bg-gray-800/30 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${formData.isFeatured ? 'bg-purple-500/20 border border-purple-500/30' : 'bg-gray-700/50 border border-gray-600/50'}`}>
+                      <TrendingUp className={`w-4 h-4 ${formData.isFeatured ? 'text-purple-400' : 'text-gray-400'}`} />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">Featured</p>
+                      <p className="text-gray-400 text-sm">Highlight on homepage</p>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      name="isFeatured"
+                      checked={formData.isFeatured}
+                      onChange={handleCheckboxChange}
+                      className="sr-only"
+                    />
+                    <div className={`w-12 h-6 rounded-full transition-colors ${formData.isFeatured ? 'bg-purple-500' : 'bg-gray-600'}`}>
+                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${formData.isFeatured ? 'translate-x-7' : 'translate-x-1'}`} />
+                    </div>
+                  </div>
+                </label>
               </div>
             </div>
           </div>
@@ -469,30 +609,18 @@ export default function CreatePostForm() {
         <div className="bg-gradient-to-br from-gray-800/50 to-gray-700/30 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-bold text-white mb-1">Ready to publish?</h3>
+              <h3 className="text-lg font-bold text-white mb-1">Save Changes</h3>
               <p className="text-gray-400 text-sm">
-                Your post will be live immediately after creation
+                Update your post with the latest changes
               </p>
             </div>
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  setFormData({
-                    title: '',
-                    description: '',
-                    content: '',
-                    category: 'Technology',
-                    tags: [],
-                    readingTime: '',
-                  });
-                  setTagInput('');
-                  setImage(null);
-                  setPreviewImage('');
-                }}
+                onClick={() => router.push('/admin/posts')}
                 className="px-6 py-3 bg-gradient-to-r from-gray-700/50 to-gray-600/30 border border-gray-600/50 text-gray-300 rounded-xl hover:from-gray-600/50 hover:to-gray-500/30 hover:text-white transition-all"
               >
-                Clear All
+                Cancel
               </button>
               <button
                 type="submit"
@@ -502,29 +630,29 @@ export default function CreatePostForm() {
                 {isLoading ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    Publishing...
+                    Saving...
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-5 h-5" />
-                    Publish Article
+                    <Save className="w-5 h-5" />
+                    Update Post
                   </>
                 )}
               </button>
             </div>
           </div>
           
-          {/* Quick Stats */}
+          {/* Stats Bar */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-700/50">
             <div className="text-center">
               <div className="text-2xl font-bold text-white mb-1">
-                {formData.title.split(' ').filter(word => word.length > 0).length}
+                {formData.title.split(' ').filter(w => w.length > 0).length}
               </div>
               <div className="text-sm text-gray-400">Title Words</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-white mb-1">
-                {formData.content.split(/\s+/).filter(word => word.length > 0).length}
+                {formData.content.split(/\s+/).filter(w => w.length > 0).length}
               </div>
               <div className="text-sm text-gray-400">Content Words</div>
             </div>
@@ -536,7 +664,7 @@ export default function CreatePostForm() {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-white mb-1">
-                {image ? '✓' : '—'}
+                {(previewImage || existingImage) ? '✓' : '—'}
               </div>
               <div className="text-sm text-gray-400">Cover Image</div>
             </div>
