@@ -14,7 +14,9 @@ import {
   X,
   ChevronRight,
   Sparkles,
-  Home
+  Home,
+  UserCheckIcon,
+  UserCircle2
 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -79,6 +81,8 @@ export default function AdminLayout({
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/admin' },
     { id: 'posts', label: 'Posts', icon: FileText, path: '/admin/posts' },
     { id: 'projects', label: 'Projects', icon: FolderKanban, path: '/admin/projects' },
+    { id: 'profileinfo', label: 'ProfileInfo', icon: UserCircle2, path: '/admin/profileinfo' },
+
     { id: 'profile', label: 'Profile', icon: User, path: '/admin/profile' },
   ];
 

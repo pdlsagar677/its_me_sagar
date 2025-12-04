@@ -1,3 +1,4 @@
+// store/adminStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -9,6 +10,7 @@ export interface BlogPost {
   excerpt: string;
   description: string;
   coverImage?: string;
+  coverImagePublicId?: string;
   category: string;
   tags: string[];
   isPublished: boolean;
@@ -31,6 +33,7 @@ export interface Project {
   githubUrl?: string;
   liveUrl?: string;
   coverImage: string;
+  coverImagePublicId?: string;
   screenshots: string[];
   isFeatured: boolean;
   status: 'completed' | 'in-progress' | 'planned';
@@ -39,10 +42,86 @@ export interface Project {
   updatedAt: Date;
 }
 
+export interface Profile {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  title: string;
+  description: string;
+  bio: string;
+  profileImage: string;
+  profileImagePublicId: string;
+  coverImage: string;
+  coverImagePublicId: string;
+  cvUrl: string;
+  cvPublicId: string;
+  socialLinks: {
+    github: string;
+    linkedin: string;
+    twitter: string;
+    facebook: string;
+    instagram: string;
+    website: string;
+    youtube: string;
+    dribbble: string;
+    behance: string;
+    medium: string;
+    stackoverflow: string;
+  };
+  experience: {
+    years: number;
+    title: string;
+    description: string;
+    projectsCompleted: number;
+    clientsCount: number;
+    companies: {
+      name: string;
+      position: string;
+      duration: string;
+      description: string;
+    }[];
+  };
+  technologies: string[];
+  skills: {
+    category: string;
+    items: string[];
+    level: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  }[];
+  education: {
+    degree: string;
+    institution: string;
+    year: string;
+    description: string;
+  }[];
+  certifications: {
+    name: string;
+    issuer: string;
+    year: string;
+    url: string;
+  }[];
+  stats: {
+    postsCount: number;
+    projectsCount: number;
+    servicesCount: number;
+    viewsCount: number;
+    githubRepos: number;
+    githubStars: number;
+  };
+  location: string;
+  availability: boolean;
+  hourlyRate?: number;
+  contactEmail: string;
+  isPublished: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface AdminState {
   // State
   posts: BlogPost[];
   projects: Project[];
+  profile: Profile | null;
   isLoading: boolean;
   error: string | null;
   
@@ -70,6 +149,37 @@ interface AdminState {
   updateProject: (projectId: string, updates: Partial<Project>) => Promise<Project>;
   deleteProject: (projectId: string) => Promise<void>;
   
+  // Profile Management
+  fetchProfile: () => Promise<void>;
+  updateProfile: (updates: Partial<Profile>) => Promise<Profile>;
+  
+  // Profile Media Upload
+  uploadProfileImage: (file: File) => Promise<Profile>;
+  uploadCoverImage: (file: File) => Promise<Profile>;
+  uploadCV: (file: File) => Promise<Profile>;
+  
+  // Profile Delete Media
+  deleteProfileImage: () => Promise<void>;
+  deleteCoverImage: () => Promise<void>;
+  deleteCV: () => Promise<void>;
+  
+  // Social Links
+  updateSocialLinks: (socialLinks: Partial<Profile['socialLinks']>) => Promise<Profile>;
+  
+  // Skills & Technologies
+  updateSkills: (skills: Profile['skills']) => Promise<Profile>;
+  updateTechnologies: (technologies: string[]) => Promise<Profile>;
+  
+  // Experience
+  updateExperience: (experience: Partial<Profile['experience']>) => Promise<Profile>;
+  
+  // Education & Certifications
+  updateEducation: (education: Profile['education']) => Promise<Profile>;
+  updateCertifications: (certifications: Profile['certifications']) => Promise<Profile>;
+  
+  // Profile Status
+  toggleProfilePublish: (isPublished: boolean) => Promise<Profile>;
+  
   // Utility
   clearError: () => void;
   generateSlug: (title: string) => string;
@@ -82,6 +192,7 @@ export const useAdminStore = create<AdminState>()(
       // Initial State
       posts: [],
       projects: [],
+      profile: null,
       isLoading: false,
       error: null,
 
@@ -137,12 +248,10 @@ export const useAdminStore = create<AdminState>()(
       createPost: async (postData) => {
         set({ isLoading: true, error: null });
         try {
-          // Generate slug and reading time
           const slug = get().generateSlug(postData.title);
           const readingTime = get().calculateReadingTime(postData.content);
           const excerpt = postData.excerpt || postData.description.substring(0, 150) + '...';
 
-          // Create FormData for file upload
           const formData = new FormData();
           formData.append('title', postData.title);
           formData.append('description', postData.description);
@@ -170,7 +279,6 @@ export const useAdminStore = create<AdminState>()(
           
           const data = await response.json();
           
-          // Add to local state
           const { posts } = get();
           set({ 
             posts: [data.post, ...posts], 
@@ -193,7 +301,6 @@ export const useAdminStore = create<AdminState>()(
         try {
           const formData = new FormData();
           
-          // Add text fields to formData
           Object.entries(updates).forEach(([key, value]) => {
             if (key !== 'image' && value !== undefined) {
               if (key === 'tags' && Array.isArray(value)) {
@@ -204,18 +311,15 @@ export const useAdminStore = create<AdminState>()(
             }
           });
           
-          // Handle image upload
           if (updates.image) {
             formData.append('image', updates.image);
           }
           
-          // If title is updated, generate new slug
           if (updates.title) {
             const slug = get().generateSlug(updates.title);
             formData.append('slug', slug);
           }
           
-          // If content is updated, calculate new reading time
           if (updates.content) {
             const readingTime = get().calculateReadingTime(updates.content);
             formData.append('readingTime', readingTime.toString());
@@ -234,7 +338,6 @@ export const useAdminStore = create<AdminState>()(
           
           const data = await response.json();
           
-          // Update local state
           const { posts } = get();
           const updatedPosts = posts.map(post => 
             post.id === postId ? { ...post, ...updates, updatedAt: new Date() } : post
@@ -266,7 +369,6 @@ export const useAdminStore = create<AdminState>()(
             throw new Error(errorData.error || 'Failed to delete post');
           }
           
-          // Remove from local state
           const { posts } = get();
           const updatedPosts = posts.filter(post => post.id !== postId);
           
@@ -347,7 +449,6 @@ export const useAdminStore = create<AdminState>()(
           
           const data = await response.json();
           
-          // Add to local state
           const { projects } = get();
           set({ 
             projects: [data.project, ...projects], 
@@ -384,7 +485,6 @@ export const useAdminStore = create<AdminState>()(
           
           const data = await response.json();
           
-          // Update local state
           const { projects } = get();
           const updatedProjects = projects.map(project => 
             project.id === projectId ? { ...project, ...updates, updatedAt: new Date() } : project
@@ -416,7 +516,6 @@ export const useAdminStore = create<AdminState>()(
             throw new Error(errorData.error || 'Failed to delete project');
           }
           
-          // Remove from local state
           const { projects } = get();
           const updatedProjects = projects.filter(project => project.id !== projectId);
           
@@ -425,6 +524,539 @@ export const useAdminStore = create<AdminState>()(
           console.error('Delete project error:', error);
           set({ 
             error: error instanceof Error ? error.message : 'Failed to delete project',
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      // Profile Management
+      fetchProfile: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/admin/profile', {
+            credentials: 'include'
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to fetch profile');
+          }
+          
+          const data = await response.json();
+          set({ profile: data.profile, isLoading: false });
+        } catch (error) {
+          console.error('Fetch profile error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to fetch profile',
+            isLoading: false 
+          });
+        }
+      },
+
+      // Update Profile
+      updateProfile: async (updates: Partial<Profile>) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/admin/profile', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ 
+              action: 'update-basic',
+              ...updates 
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to update profile');
+          }
+          
+          const data = await response.json();
+          
+          set({ 
+            profile: data.profile, 
+            isLoading: false 
+          });
+          
+          return data.profile;
+        } catch (error) {
+          console.error('Update profile error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to update profile',
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      // Update Social Links
+      updateSocialLinks: async (socialLinks: Partial<Profile['socialLinks']>) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/admin/profile', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ 
+              action: 'update-social',
+              socialLinks 
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to update social links');
+          }
+          
+          const data = await response.json();
+          
+          set({ 
+            profile: data.profile, 
+            isLoading: false 
+          });
+          
+          return data.profile;
+        } catch (error) {
+          console.error('Update social links error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to update social links',
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      // Update Skills
+      updateSkills: async (skills: Profile['skills']) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/admin/profile', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ 
+              action: 'update-skills',
+              skills 
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to update skills');
+          }
+          
+          const data = await response.json();
+          
+          set({ 
+            profile: data.profile, 
+            isLoading: false 
+          });
+          
+          return data.profile;
+        } catch (error) {
+          console.error('Update skills error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to update skills',
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      // Update Technologies
+      updateTechnologies: async (technologies: string[]) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/admin/profile', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ 
+              action: 'update-technologies',
+              technologies 
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to update technologies');
+          }
+          
+          const data = await response.json();
+          
+          set({ 
+            profile: data.profile, 
+            isLoading: false 
+          });
+          
+          return data.profile;
+        } catch (error) {
+          console.error('Update technologies error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to update technologies',
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      // Update Experience
+      updateExperience: async (experience: Partial<Profile['experience']>) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/admin/profile', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ 
+              action: 'update-experience',
+              experience 
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to update experience');
+          }
+          
+          const data = await response.json();
+          
+          set({ 
+            profile: data.profile, 
+            isLoading: false 
+          });
+          
+          return data.profile;
+        } catch (error) {
+          console.error('Update experience error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to update experience',
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      // Update Education
+      updateEducation: async (education: Profile['education']) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/admin/profile', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ 
+              action: 'update-education',
+              education 
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to update education');
+          }
+          
+          const data = await response.json();
+          
+          set({ 
+            profile: data.profile, 
+            isLoading: false 
+          });
+          
+          return data.profile;
+        } catch (error) {
+          console.error('Update education error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to update education',
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      // Update Certifications
+      updateCertifications: async (certifications: Profile['certifications']) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/admin/profile', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ 
+              action: 'update-certifications',
+              certifications 
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to update certifications');
+          }
+          
+          const data = await response.json();
+          
+          set({ 
+            profile: data.profile, 
+            isLoading: false 
+          });
+          
+          return data.profile;
+        } catch (error) {
+          console.error('Update certifications error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to update certifications',
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      // Profile Media Upload
+      uploadProfileImage: async (file: File) => {
+        set({ isLoading: true, error: null });
+        try {
+          const formData = new FormData();
+          formData.append('image', file);
+          formData.append('action', 'upload-profile-image');
+          
+          const response = await fetch('/api/admin/profile', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to upload profile image');
+          }
+          
+          const data = await response.json();
+          
+          set({ 
+            profile: data.profile, 
+            isLoading: false 
+          });
+          
+          return data.profile;
+        } catch (error) {
+          console.error('Upload profile image error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to upload profile image',
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      uploadCoverImage: async (file: File) => {
+        set({ isLoading: true, error: null });
+        try {
+          const formData = new FormData();
+          formData.append('image', file);
+          formData.append('action', 'upload-cover-image');
+          
+          const response = await fetch('/api/admin/profile', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to upload cover image');
+          }
+          
+          const data = await response.json();
+          
+          set({ 
+            profile: data.profile, 
+            isLoading: false 
+          });
+          
+          return data.profile;
+        } catch (error) {
+          console.error('Upload cover image error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to upload cover image',
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      uploadCV: async (file: File) => {
+        set({ isLoading: true, error: null });
+        try {
+          const formData = new FormData();
+          formData.append('cv', file);
+          formData.append('action', 'upload-cv');
+          
+          const response = await fetch('/api/admin/profile', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to upload CV');
+          }
+          
+          const data = await response.json();
+          
+          set({ 
+            profile: data.profile, 
+            isLoading: false 
+          });
+          
+          return data.profile;
+        } catch (error) {
+          console.error('Upload CV error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to upload CV',
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      // Profile Delete Media
+      deleteProfileImage: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/admin/profile?action=delete-profile-image', {
+            method: 'DELETE',
+            credentials: 'include',
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to delete profile image');
+          }
+          
+          const data = await response.json();
+          
+          set({ 
+            profile: data.profile, 
+            isLoading: false 
+          });
+        } catch (error) {
+          console.error('Delete profile image error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to delete profile image',
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      deleteCoverImage: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/admin/profile?action=delete-cover-image', {
+            method: 'DELETE',
+            credentials: 'include',
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to delete cover image');
+          }
+          
+          const data = await response.json();
+          
+          set({ 
+            profile: data.profile, 
+            isLoading: false 
+          });
+        } catch (error) {
+          console.error('Delete cover image error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to delete cover image',
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      deleteCV: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/admin/profile?action=delete-cv', {
+            method: 'DELETE',
+            credentials: 'include',
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to delete CV');
+          }
+          
+          const data = await response.json();
+          
+          set({ 
+            profile: data.profile, 
+            isLoading: false 
+          });
+        } catch (error) {
+          console.error('Delete CV error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to delete CV',
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      // Profile Status
+      toggleProfilePublish: async (isPublished: boolean) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/admin/profile', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ 
+              action: 'toggle-publish', 
+              isPublished 
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to update profile status');
+          }
+          
+          const data = await response.json();
+          
+          set({ 
+            profile: data.profile, 
+            isLoading: false 
+          });
+          
+          return data.profile;
+        } catch (error) {
+          console.error('Update profile status error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to update profile status',
             isLoading: false 
           });
           throw error;
@@ -455,6 +1087,7 @@ export const useAdminStore = create<AdminState>()(
       partialize: (state) => ({
         posts: state.posts,
         projects: state.projects,
+        profile: state.profile,
       }),
     }
   )
