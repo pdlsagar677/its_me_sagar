@@ -33,7 +33,7 @@ const PortfolioNavbar = () => {
       id: 'service', 
       label: 'Services', 
       icon: Briefcase, 
-      href: '/services' 
+      href: '/service' 
     },
     { 
       id: 'contact', 
