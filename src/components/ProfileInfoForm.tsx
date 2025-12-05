@@ -22,17 +22,17 @@ import {
   GraduationCap,
   Star,
   Download,
-  Eye,
-  EyeOff,
   Plus,
   Sparkles,
-  Type,
-  Tag,
-  Layout,
   Code,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Layers,
   BookOpen,
-  Shield,
-  ExternalLink
+  Settings,
+  Zap,
+  FolderOpen
 } from 'lucide-react';
 import Image from 'next/image';
 import { toast } from 'react-hot-toast';
@@ -102,8 +102,9 @@ const ProfileInfo = () => {
     }>,
   });
 
-  // Skills state
+  // Skills state with better management
   const [skills, setSkills] = useState<Array<{
+    id: string;
     category: string;
     items: string[];
     level: 'beginner' | 'intermediate' | 'advanced' | 'expert';
@@ -111,10 +112,10 @@ const ProfileInfo = () => {
 
   // Technologies state
   const [technologies, setTechnologies] = useState<string[]>([]);
-  const [newTechnology, setNewTechnology] = useState('');
 
   // Education state
   const [education, setEducation] = useState<Array<{
+    id: string;
     degree: string;
     institution: string;
     year: string;
@@ -123,6 +124,7 @@ const ProfileInfo = () => {
 
   // Certifications state
   const [certifications, setCertifications] = useState<Array<{
+    id: string;
     name: string;
     issuer: string;
     year: string;
@@ -137,8 +139,22 @@ const ProfileInfo = () => {
   // Editing states
   const [isEditing, setIsEditing] = useState(false);
   const [editingSection, setEditingSection] = useState<string | null>(null);
-  const [newSkillCategory, setNewSkillCategory] = useState('');
-  const [newSkillItem, setNewSkillItem] = useState('');
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    skills: true,
+    experience: true,
+    education: true,
+    certifications: true,
+    social: true,
+    technologies: true
+  });
+
+  // Add form states
+  const [newSkill, setNewSkill] = useState({
+    category: '',
+    item: '',
+    level: 'intermediate' as 'beginner' | 'intermediate' | 'advanced' | 'expert'
+  });
+  const [newTechnology, setNewTechnology] = useState('');
   const [newEducation, setNewEducation] = useState({
     degree: '',
     institution: '',
@@ -157,6 +173,9 @@ const ProfileInfo = () => {
     duration: '',
     description: ''
   });
+
+  // Generate unique ID
+  const generateId = () => Math.random().toString(36).substr(2, 9);
 
   // Load profile data on mount
   useEffect(() => {
@@ -188,10 +207,10 @@ const ProfileInfo = () => {
         years: 0, title: '', description: '', projectsCompleted: 0, clientsCount: 0, companies: []
       });
 
-      setSkills(profile.skills || []);
+      setSkills((profile.skills || []).map(skill => ({ ...skill, id: generateId() })));
       setTechnologies(profile.technologies || []);
-      setEducation(profile.education || []);
-      setCertifications(profile.certifications || []);
+      setEducation((profile.education || []).map(edu => ({ ...edu, id: generateId() })));
+      setCertifications((profile.certifications || []).map(cert => ({ ...cert, id: generateId() })));
     }
   }, [profile]);
 
@@ -301,7 +320,6 @@ const ProfileInfo = () => {
     try {
       await updateExperience(experience);
       toast.success('Experience saved');
-      setEditingSection(null);
     } catch (error) {
       console.error('Save experience error:', error);
       toast.error('Failed to save experience');
@@ -311,9 +329,10 @@ const ProfileInfo = () => {
   // Save skills
   const saveSkills = async () => {
     try {
-      await updateSkills(skills);
+      // Remove IDs before saving
+      const skillsToSave = skills.map(({ id, ...skill }) => skill);
+      await updateSkills(skillsToSave);
       toast.success('Skills saved');
-      setEditingSection(null);
     } catch (error) {
       console.error('Save skills error:', error);
       toast.error('Failed to save skills');
@@ -325,7 +344,6 @@ const ProfileInfo = () => {
     try {
       await updateTechnologies(technologies);
       toast.success('Technologies saved');
-      setEditingSection(null);
     } catch (error) {
       console.error('Save technologies error:', error);
       toast.error('Failed to save technologies');
@@ -335,9 +353,10 @@ const ProfileInfo = () => {
   // Save education
   const saveEducation = async () => {
     try {
-      await updateEducation(education);
+      // Remove IDs before saving
+      const educationToSave = education.map(({ id, ...edu }) => edu);
+      await updateEducation(educationToSave);
       toast.success('Education saved');
-      setEditingSection(null);
     } catch (error) {
       console.error('Save education error:', error);
       toast.error('Failed to save education');
@@ -347,9 +366,10 @@ const ProfileInfo = () => {
   // Save certifications
   const saveCertifications = async () => {
     try {
-      await updateCertifications(certifications);
+      // Remove IDs before saving
+      const certificationsToSave = certifications.map(({ id, ...cert }) => cert);
+      await updateCertifications(certificationsToSave);
       toast.success('Certifications saved');
-      setEditingSection(null);
     } catch (error) {
       console.error('Save certifications error:', error);
       toast.error('Failed to save certifications');
@@ -361,73 +381,114 @@ const ProfileInfo = () => {
     if (newTechnology.trim() && !technologies.includes(newTechnology.trim())) {
       setTechnologies([...technologies, newTechnology.trim()]);
       setNewTechnology('');
+      toast.success('Technology added');
     }
   };
 
   // Remove technology
   const removeTechnology = (tech: string) => {
     setTechnologies(technologies.filter(t => t !== tech));
+    toast.success('Technology removed');
   };
 
-  // Add skill category
-  const addSkillCategory = () => {
-    if (newSkillCategory.trim()) {
-      setSkills([...skills, { 
-        category: newSkillCategory.trim(), 
-        items: [], 
-        level: 'intermediate' 
-      }]);
-      setNewSkillCategory('');
-    }
-  };
-
-  // Add skill item
-  const addSkillItem = (categoryIndex: number) => {
-    if (newSkillItem.trim()) {
-      const updatedSkills = [...skills];
-      if (!updatedSkills[categoryIndex].items.includes(newSkillItem.trim())) {
-        updatedSkills[categoryIndex].items.push(newSkillItem.trim());
-        setSkills(updatedSkills);
-        setNewSkillItem('');
+  // Add skill
+  const addSkill = () => {
+    if (newSkill.category.trim() && newSkill.item.trim()) {
+      const existingCategory = skills.find(s => s.category === newSkill.category.trim());
+      
+      if (existingCategory) {
+        // Add item to existing category
+        if (!existingCategory.items.includes(newSkill.item.trim())) {
+          const updatedSkills = skills.map(skill => 
+            skill.id === existingCategory.id 
+              ? { ...skill, items: [...skill.items, newSkill.item.trim()] }
+              : skill
+          );
+          setSkills(updatedSkills);
+          toast.success('Skill added to category');
+        } else {
+          toast.error('Skill already exists in this category');
+        }
       } else {
-        toast.error('Skill already exists in this category');
+        // Create new category
+        const newSkillObj = {
+          id: generateId(),
+          category: newSkill.category.trim(),
+          items: [newSkill.item.trim()],
+          level: newSkill.level
+        };
+        setSkills([...skills, newSkillObj]);
+        toast.success('New skill category created');
       }
+      
+      // Reset form
+      setNewSkill({ category: '', item: '', level: 'intermediate' });
     }
   };
 
   // Remove skill item
-  const removeSkillItem = (categoryIndex: number, itemIndex: number) => {
-    const updatedSkills = [...skills];
-    updatedSkills[categoryIndex].items.splice(itemIndex, 1);
+  const removeSkillItem = (skillId: string, itemIndex: number) => {
+    const updatedSkills = skills.map(skill => {
+      if (skill.id === skillId) {
+        const newItems = [...skill.items];
+        newItems.splice(itemIndex, 1);
+        return { ...skill, items: newItems };
+      }
+      return skill;
+    }).filter(skill => skill.items.length > 0); // Remove empty categories
+    
     setSkills(updatedSkills);
+    toast.success('Skill removed');
+  };
+
+  // Remove skill category
+  const removeSkillCategory = (skillId: string) => {
+    setSkills(skills.filter(skill => skill.id !== skillId));
+    toast.success('Skill category removed');
   };
 
   // Add education
   const addEducation = () => {
     if (newEducation.degree.trim() && newEducation.institution.trim()) {
-      setEducation([...education, { ...newEducation }]);
+      setEducation([...education, { ...newEducation, id: generateId() }]);
       setNewEducation({ degree: '', institution: '', year: '', description: '' });
       toast.success('Education added');
     }
   };
 
+  // Update education
+  const updateEducationItem = (id: string, updates: Partial<typeof newEducation>) => {
+    setEducation(education.map(edu => 
+      edu.id === id ? { ...edu, ...updates } : edu
+    ));
+  };
+
   // Remove education
-  const removeEducation = (index: number) => {
-    setEducation(education.filter((_, i) => i !== index));
+  const removeEducation = (id: string) => {
+    setEducation(education.filter(edu => edu.id !== id));
+    toast.success('Education removed');
   };
 
   // Add certification
   const addCertification = () => {
     if (newCertification.name.trim() && newCertification.issuer.trim()) {
-      setCertifications([...certifications, { ...newCertification }]);
+      setCertifications([...certifications, { ...newCertification, id: generateId() }]);
       setNewCertification({ name: '', issuer: '', year: '', url: '' });
       toast.success('Certification added');
     }
   };
 
+  // Update certification
+  const updateCertificationItem = (id: string, updates: Partial<typeof newCertification>) => {
+    setCertifications(certifications.map(cert => 
+      cert.id === id ? { ...cert, ...updates } : cert
+    ));
+  };
+
   // Remove certification
-  const removeCertification = (index: number) => {
-    setCertifications(certifications.filter((_, i) => i !== index));
+  const removeCertification = (id: string) => {
+    setCertifications(certifications.filter(cert => cert.id !== id));
+    toast.success('Certification removed');
   };
 
   // Add company
@@ -442,12 +503,20 @@ const ProfileInfo = () => {
     }
   };
 
+  // Update company
+  const updateCompany = (index: number, updates: Partial<typeof newCompany>) => {
+    const updatedCompanies = [...experience.companies];
+    updatedCompanies[index] = { ...updatedCompanies[index], ...updates };
+    setExperience(prev => ({ ...prev, companies: updatedCompanies }));
+  };
+
   // Remove company
   const removeCompany = (index: number) => {
     setExperience(prev => ({
       ...prev,
       companies: prev.companies.filter((_, i) => i !== index)
     }));
+    toast.success('Work experience removed');
   };
 
   // Toggle profile publish
@@ -458,6 +527,32 @@ const ProfileInfo = () => {
     } catch (error) {
       console.error('Toggle publish error:', error);
       toast.error('Failed to update profile status');
+    }
+  };
+
+  // Toggle section expansion
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  // Save all sections
+  const saveAllSections = async () => {
+    try {
+      await Promise.all([
+        saveBasicInfo(),
+        saveSocialLinks(),
+        saveExperience(),
+        saveSkills(),
+        saveTechnologies(),
+        saveEducation(),
+        saveCertifications()
+      ]);
+      toast.success('All changes saved successfully');
+    } catch (error) {
+      toast.error('Failed to save some sections');
     }
   };
 
@@ -486,7 +581,7 @@ const ProfileInfo = () => {
                   <p className="text-gray-600 mt-2">Manage your portfolio profile and information</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-4">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <div className="flex items-center space-x-2 bg-gradient-to-r from-gray-800/20 to-gray-700/10 backdrop-blur-sm rounded-lg p-3 border border-gray-600/20">
                   <div className={`w-3 h-3 rounded-full ${profile?.isPublished ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`}></div>
                   <span className="text-sm font-medium text-gray-800">
@@ -502,6 +597,13 @@ const ProfileInfo = () => {
                   }`}
                 >
                   {profile?.isPublished ? 'Unpublish' : 'Publish Now'}
+                </button>
+                <button
+                  onClick={saveAllSections}
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-medium flex items-center"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Save All
                 </button>
               </div>
             </div>
@@ -771,31 +873,22 @@ const ProfileInfo = () => {
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900">Basic Information</h2>
                 </div>
-                {isEditing ? (
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={() => setIsEditing(false)}
-                      className="px-5 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 font-medium"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={saveBasicInfo}
-                      className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center font-medium"
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Changes
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="px-5 py-2.5 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl hover:from-gray-200 hover:to-gray-300 transition-all flex items-center font-medium"
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Information
-                  </button>
-                )}
+                <button
+                  onClick={() => setIsEditing(!isEditing)}
+                  className="px-5 py-2.5 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl hover:from-gray-200 hover:to-gray-300 transition-all flex items-center font-medium"
+                >
+                  {isEditing ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Done Editing
+                    </>
+                  ) : (
+                    <>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Information
+                    </>
+                  )}
+                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -958,189 +1051,163 @@ const ProfileInfo = () => {
                   Available for work & freelance opportunities
                 </label>
               </div>
+
+              {isEditing && (
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={saveBasicInfo}
+                    className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center font-medium"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Changes
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Social Links Card */}
             <div className="bg-gradient-to-br from-white to-gray-50/50 rounded-2xl shadow-xl p-6 border border-gray-200/50">
-              <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-gradient-to-r from-purple-500/20 to-pink-500/10 rounded-xl border border-purple-500/20">
                     <Globe className="w-6 h-6 text-purple-600" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900">Social Links</h2>
                 </div>
-                {editingSection === 'social' ? (
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={() => setEditingSection(null)}
-                      className="px-5 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 font-medium"
-                    >
-                      Cancel
-                    </button>
+                <button
+                  onClick={() => toggleSection('social')}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  {expandedSections.social ? (
+                    <ChevronUp className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
+              </div>
+
+              {expandedSections.social && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+                    {Object.entries(socialLinks).map(([platform, url]) => (
+                      <div key={platform} className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-800 flex items-center">
+                          <Link className="w-4 h-4 mr-2 text-purple-600" />
+                          {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                        </label>
+                        <input
+                          type="url"
+                          value={url}
+                          onChange={(e) => handleSocialLinkChange(platform, e.target.value)}
+                          className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 font-medium"
+                          placeholder={`https://${platform}.com/username`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-end">
                     <button
                       onClick={saveSocialLinks}
                       className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all flex items-center font-medium"
                     >
                       <Save className="w-4 h-4 mr-2" />
-                      Save Links
+                      Save Social Links
                     </button>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => setEditingSection('social')}
-                    className="px-5 py-2.5 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl hover:from-gray-200 hover:to-gray-300 transition-all flex items-center font-medium"
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Links
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {Object.entries(socialLinks).map(([platform, url]) => (
-                  <div key={platform} className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-800 flex items-center">
-                      <Link className="w-4 h-4 mr-2 text-purple-600" />
-                      {platform.charAt(0).toUpperCase() + platform.slice(1)}
-                    </label>
-                    <input
-                      type="url"
-                      value={url}
-                      onChange={(e) => handleSocialLinkChange(platform, e.target.value)}
-                      disabled={editingSection !== 'social'}
-                      className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100 disabled:text-gray-500 text-gray-800 font-medium"
-                      placeholder={`https://${platform}.com/username`}
-                    />
-                  </div>
-                ))}
-              </div>
+                </>
+              )}
             </div>
 
             {/* Experience Card */}
             <div className="bg-gradient-to-br from-white to-gray-50/50 rounded-2xl shadow-xl p-6 border border-gray-200/50">
-              <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-gradient-to-r from-amber-500/20 to-orange-500/10 rounded-xl border border-amber-500/20">
                     <Briefcase className="w-6 h-6 text-amber-600" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900">Experience</h2>
                 </div>
-                {editingSection === 'experience' ? (
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={() => setEditingSection(null)}
-                      className="px-5 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 font-medium"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={saveExperience}
-                      className="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-xl hover:from-amber-700 hover:to-orange-700 transition-all flex items-center font-medium"
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Experience
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setEditingSection('experience')}
-                    className="px-5 py-2.5 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl hover:from-gray-200 hover:to-gray-300 transition-all flex items-center font-medium"
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Experience
-                  </button>
-                )}
+                <button
+                  onClick={() => toggleSection('experience')}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  {expandedSections.experience ? (
+                    <ChevronUp className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
               </div>
 
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-2">
-                      Years of Experience
-                    </label>
-                    <input
-                      type="number"
-                      value={experience.years}
-                      onChange={(e) => handleExperienceChange('years', parseInt(e.target.value) || 0)}
-                      disabled={editingSection !== 'experience'}
-                      className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 disabled:bg-gray-100 disabled:text-gray-500 text-gray-800 font-medium"
-                    />
-                  </div>
+              {expandedSections.experience && (
+                <>
+                  <div className="space-y-6 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-800 mb-2">
+                          Years of Experience
+                        </label>
+                        <input
+                          type="number"
+                          value={experience.years}
+                          onChange={(e) => handleExperienceChange('years', parseInt(e.target.value) || 0)}
+                          className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-gray-800 font-medium"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-2">
-                      Experience Title
-                    </label>
-                    <input
-                      type="text"
-                      value={experience.title}
-                      onChange={(e) => handleExperienceChange('title', e.target.value)}
-                      disabled={editingSection !== 'experience'}
-                      className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 disabled:bg-gray-100 disabled:text-gray-500 text-gray-800 font-medium"
-                      placeholder="Senior Developer"
-                    />
-                  </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-800 mb-2">
+                          Experience Title
+                        </label>
+                        <input
+                          type="text"
+                          value={experience.title}
+                          onChange={(e) => handleExperienceChange('title', e.target.value)}
+                          className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-gray-800 font-medium"
+                          placeholder="Senior Developer"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-2">
-                      Projects Completed
-                    </label>
-                    <input
-                      type="number"
-                      value={experience.projectsCompleted}
-                      onChange={(e) => handleExperienceChange('projectsCompleted', parseInt(e.target.value) || 0)}
-                      disabled={editingSection !== 'experience'}
-                      className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 disabled:bg-gray-100 disabled:text-gray-500 text-gray-800 font-medium"
-                    />
-                  </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-800 mb-2">
+                          Projects Completed
+                        </label>
+                        <input
+                          type="number"
+                          value={experience.projectsCompleted}
+                          onChange={(e) => handleExperienceChange('projectsCompleted', parseInt(e.target.value) || 0)}
+                          className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-gray-800 font-medium"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-2">
-                      Clients Count
-                    </label>
-                    <input
-                      type="number"
-                      value={experience.clientsCount}
-                      onChange={(e) => handleExperienceChange('clientsCount', parseInt(e.target.value) || 0)}
-                      disabled={editingSection !== 'experience'}
-                      className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 disabled:bg-gray-100 disabled:text-gray-500 text-gray-800 font-medium"
-                    />
-                  </div>
-                </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-800 mb-2">
+                          Clients Count
+                        </label>
+                        <input
+                          type="number"
+                          value={experience.clientsCount}
+                          onChange={(e) => handleExperienceChange('clientsCount', parseInt(e.target.value) || 0)}
+                          className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-gray-800 font-medium"
+                        />
+                      </div>
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-800 mb-2">
-                    Experience Description
-                  </label>
-                  <textarea
-                    value={experience.description}
-                    onChange={(e) => handleExperienceChange('description', e.target.value)}
-                    disabled={editingSection !== 'experience'}
-                    rows={3}
-                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 disabled:bg-gray-100 disabled:text-gray-500 text-gray-800 font-medium"
-                  />
-                </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-800 mb-2">
+                        Experience Description
+                      </label>
+                      <textarea
+                        value={experience.description}
+                        onChange={(e) => handleExperienceChange('description', e.target.value)}
+                        rows={3}
+                        className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-gray-800 font-medium"
+                      />
+                    </div>
 
-                {/* Work Experience Companies */}
-                <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-bold text-gray-800">Work Experience</h3>
-                    {editingSection === 'experience' && (
-                      <button
-                        onClick={() => {
-                          setEditingSection('add-company');
-                        }}
-                        className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all flex items-center font-medium"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Company
-                      </button>
-                    )}
-                  </div>
-
-                  {editingSection === 'add-company' && (
-                    <div className="mb-6 p-5 border border-dashed border-amber-300 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/50">
-                      <h4 className="font-bold text-gray-800 mb-4">Add New Work Experience</h4>
+                    {/* Add Company Form */}
+                    <div className="p-5 border border-dashed border-amber-300 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/50">
+                      <h4 className="font-bold text-gray-800 mb-4">Add Work Experience</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <input
                           type="text"
@@ -1171,530 +1238,534 @@ const ProfileInfo = () => {
                         rows={3}
                         className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 mb-4 text-gray-800 font-medium"
                       />
-                      <div className="flex space-x-3">
-                        <button
-                          onClick={addCompany}
-                          className="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-xl hover:from-amber-700 hover:to-orange-700 transition-all font-medium"
-                        >
-                          Add Experience
-                        </button>
-                        <button
-                          onClick={() => setEditingSection('experience')}
-                          className="px-5 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 font-medium"
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                      <button
+                        onClick={addCompany}
+                        className="w-full px-5 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-xl hover:from-amber-700 hover:to-orange-700 transition-all flex items-center justify-center font-medium"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Work Experience
+                      </button>
                     </div>
-                  )}
 
-                  <div className="space-y-4">
-                    {experience.companies.map((company, index) => (
-                      <div key={index} className="p-5 border border-gray-200 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100/50">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-bold text-gray-800">{company.name}</h4>
-                            <p className="text-gray-600 mt-1 font-medium">{company.position}</p>
-                            <p className="text-sm text-gray-500 mt-1">{company.duration}</p>
-                            <p className="mt-3 text-gray-700">{company.description}</p>
-                          </div>
-                          {editingSection === 'experience' && (
+                    {/* Companies List */}
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-bold text-gray-800">Work Experience ({experience.companies.length})</h4>
+                      {experience.companies.map((company, index) => (
+                        <div key={index} className="p-5 border border-gray-200 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100/50">
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex-1 space-y-2">
+                              <input
+                                type="text"
+                                value={company.name}
+                                onChange={(e) => updateCompany(index, { name: e.target.value })}
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 font-medium text-lg"
+                                placeholder="Company Name"
+                              />
+                              <input
+                                type="text"
+                                value={company.position}
+                                onChange={(e) => updateCompany(index, { position: e.target.value })}
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-600 font-medium"
+                                placeholder="Position"
+                              />
+                              <input
+                                type="text"
+                                value={company.duration}
+                                onChange={(e) => updateCompany(index, { duration: e.target.value })}
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-500"
+                                placeholder="Duration"
+                              />
+                            </div>
                             <button
                               onClick={() => removeCompany(index)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-4"
                               title="Remove"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
-                          )}
+                          </div>
+                          <textarea
+                            value={company.description}
+                            onChange={(e) => updateCompany(index, { description: e.target.value })}
+                            rows={3}
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700"
+                            placeholder="Description"
+                          />
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </div>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={saveExperience}
+                      className="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-xl hover:from-amber-700 hover:to-orange-700 transition-all flex items-center font-medium"
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Experience
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Skills & Technologies Card */}
             <div className="bg-gradient-to-br from-white to-gray-50/50 rounded-2xl shadow-xl p-6 border border-gray-200/50">
-              <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-gradient-to-r from-emerald-500/20 to-teal-500/10 rounded-xl border border-emerald-500/20">
                     <Star className="w-6 h-6 text-emerald-600" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900">Skills & Technologies</h2>
                 </div>
-                <div className="flex space-x-3">
-                  {editingSection === 'skills' ? (
-                    <>
-                      <button
-                        onClick={() => setEditingSection(null)}
-                        className="px-4 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 font-medium"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={saveSkills}
-                        className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all font-medium"
-                      >
-                        Save Skills
-                      </button>
-                    </>
+                <button
+                  onClick={() => toggleSection('skills')}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  {expandedSections.skills ? (
+                    <ChevronUp className="w-5 h-5 text-gray-500" />
                   ) : (
-                    <button
-                      onClick={() => setEditingSection('skills')}
-                      className="px-4 py-2.5 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl hover:from-gray-200 hover:to-gray-300 transition-all font-medium"
-                    >
-                      Edit Skills
-                    </button>
+                    <ChevronDown className="w-5 h-5 text-gray-500" />
                   )}
-
-                  {editingSection === 'technologies' ? (
-                    <>
-                      <button
-                        onClick={() => setEditingSection(null)}
-                        className="px-4 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 font-medium"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={saveTechnologies}
-                        className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-medium"
-                      >
-                        Save Tech
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => setEditingSection('technologies')}
-                      className="px-4 py-2.5 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl hover:from-gray-200 hover:to-gray-300 transition-all font-medium"
-                    >
-                      Edit Tech
-                    </button>
-                  )}
-                </div>
+                </button>
               </div>
 
-              {/* Skills Section */}
-              <div className="mb-10">
-                <h3 className="text-lg font-bold text-gray-800 mb-6">Skills</h3>
-                
-                {editingSection === 'skills' && (
-                  <div className="mb-6 p-5 border border-dashed border-emerald-300 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50/50">
-                    <h4 className="font-bold text-gray-800 mb-4">Add Skill Category</h4>
-                    <div className="flex gap-3 mb-5">
-                      <input
-                        type="text"
-                        value={newSkillCategory}
-                        onChange={(e) => setNewSkillCategory(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addSkillCategory()}
-                        placeholder="Category (e.g., Frontend, Backend)"
-                        className="flex-1 px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800 font-medium"
-                      />
-                      <button
-                        onClick={addSkillCategory}
-                        className="px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center font-medium"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add
-                      </button>
-                    </div>
+              {expandedSections.skills && (
+                <>
+                  {/* Skills Section */}
+                  <div className="mb-10">
+                    <h3 className="text-lg font-bold text-gray-800 mb-6">Skills</h3>
                     
-                    <h4 className="font-bold text-gray-800 mb-4">Add Skill Item</h4>
-                    <div className="flex gap-3">
-                      <input
-                        type="text"
-                        value={newSkillItem}
-                        onChange={(e) => setNewSkillItem(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addSkillItem(0)}
-                        placeholder="Skill name (e.g., React, Node.js)"
-                        className="flex-1 px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800 font-medium"
-                      />
-                      <select
-                        className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800 font-medium"
-                        onChange={(e) => {
-                          const categoryIndex = skills.findIndex(s => s.category === e.target.value);
-                          if (categoryIndex >= 0 && newSkillItem.trim()) {
-                            addSkillItem(categoryIndex);
-                          }
-                        }}
-                      >
-                        <option value="">Select category</option>
-                        {skills.map((skill, index) => (
-                          <option key={index} value={skill.category}>
-                            {skill.category}
-                          </option>
-                        ))}
-                      </select>
+                    {/* Add Skill Form */}
+                    <div className="mb-6 p-5 border border-dashed border-emerald-300 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50/50">
+                      <h4 className="font-bold text-gray-800 mb-4">Add New Skill</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <input
+                          type="text"
+                          value={newSkill.category}
+                          onChange={(e) => setNewSkill({...newSkill, category: e.target.value})}
+                          placeholder="Category (e.g., Frontend)"
+                          className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800 font-medium"
+                        />
+                        <input
+                          type="text"
+                          value={newSkill.item}
+                          onChange={(e) => setNewSkill({...newSkill, item: e.target.value})}
+                          placeholder="Skill (e.g., React)"
+                          className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800 font-medium"
+                        />
+                        <select
+                          value={newSkill.level}
+                          onChange={(e) => setNewSkill({...newSkill, level: e.target.value as any})}
+                          className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800 font-medium"
+                        >
+                          <option value="beginner">Beginner</option>
+                          <option value="intermediate">Intermediate</option>
+                          <option value="advanced">Advanced</option>
+                          <option value="expert">Expert</option>
+                        </select>
+                      </div>
                       <button
-                        onClick={() => {
-                          if (skills.length > 0 && newSkillItem.trim()) {
-                            // Add to first category by default
-                            addSkillItem(0);
-                          }
-                        }}
-                        className="px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center font-medium"
+                        onClick={addSkill}
+                        className="w-full px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center justify-center font-medium"
                       >
                         <Plus className="w-4 h-4 mr-2" />
                         Add Skill
                       </button>
                     </div>
-                  </div>
-                )}
 
-                <div className="space-y-4">
-                  {skills.map((skillCategory, categoryIndex) => (
-                    <div key={categoryIndex} className="border border-gray-200 rounded-xl p-5 bg-gradient-to-r from-gray-50 to-gray-100/50">
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="font-bold text-gray-800">{skillCategory.category}</h4>
-                        {editingSection === 'skills' && (
-                          <div className="flex items-center space-x-3">
-                            <select
-                              value={skillCategory.level}
-                              onChange={(e) => {
-                                const updatedSkills = [...skills];
-                                updatedSkills[categoryIndex].level = e.target.value as any;
-                                setSkills(updatedSkills);
-                              }}
-                              className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800 font-medium"
-                            >
-                              <option value="beginner">Beginner</option>
-                              <option value="intermediate">Intermediate</option>
-                              <option value="advanced">Advanced</option>
-                              <option value="expert">Expert</option>
-                            </select>
+                    {/* Skills List */}
+                    <div className="space-y-4">
+                      {skills.map((skillCategory) => (
+                        <div key={skillCategory.id} className="border border-gray-200 rounded-xl p-5 bg-gradient-to-r from-gray-50 to-gray-100/50">
+                          <div className="flex justify-between items-center mb-3">
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="text"
+                                value={skillCategory.category}
+                                onChange={(e) => {
+                                  const updatedSkills = skills.map(skill => 
+                                    skill.id === skillCategory.id 
+                                      ? { ...skill, category: e.target.value }
+                                      : skill
+                                  );
+                                  setSkills(updatedSkills);
+                                }}
+                                className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 font-medium text-lg"
+                              />
+                              <select
+                                value={skillCategory.level}
+                                onChange={(e) => {
+                                  const updatedSkills = skills.map(skill => 
+                                    skill.id === skillCategory.id 
+                                      ? { ...skill, level: e.target.value as any }
+                                      : skill
+                                  );
+                                  setSkills(updatedSkills);
+                                }}
+                                className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 font-medium"
+                              >
+                                <option value="beginner">Beginner</option>
+                                <option value="intermediate">Intermediate</option>
+                                <option value="advanced">Advanced</option>
+                                <option value="expert">Expert</option>
+                              </select>
+                            </div>
                             <button
-                              onClick={() => {
-                                const updatedSkills = skills.filter((_, i) => i !== categoryIndex);
-                                setSkills(updatedSkills);
-                              }}
-                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              onClick={() => removeSkillCategory(skillCategory.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                               title="Remove category"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-2">
-                        {skillCategory.items.map((item, itemIndex) => (
-                          <span key={itemIndex} className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-100 to-teal-100 border border-emerald-200 text-emerald-800 text-sm font-medium">
-                            <Code className="w-3 h-3 mr-1.5" />
-                            {item}
-                            {editingSection === 'skills' && (
-                              <button
-                                onClick={() => removeSkillItem(categoryIndex, itemIndex)}
-                                className="ml-1.5 text-red-500 hover:text-red-700"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            )}
-                          </span>
-                        ))}
-                        {skillCategory.items.length === 0 && editingSection !== 'skills' && (
-                          <p className="text-gray-400 text-sm">No skills added yet</p>
-                        )}
-                      </div>
+                          
+                          <div className="flex flex-wrap gap-2">
+                            {skillCategory.items.map((item, itemIndex) => (
+                              <span key={itemIndex} className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-100 to-teal-100 border border-emerald-200 text-emerald-800 text-sm font-medium">
+                                <Code className="w-3 h-3 mr-1.5" />
+                                <input
+                                  type="text"
+                                  value={item}
+                                  onChange={(e) => {
+                                    const updatedItems = [...skillCategory.items];
+                                    updatedItems[itemIndex] = e.target.value;
+                                    const updatedSkills = skills.map(skill => 
+                                      skill.id === skillCategory.id 
+                                        ? { ...skill, items: updatedItems }
+                                        : skill
+                                    );
+                                    setSkills(updatedSkills);
+                                  }}
+                                  className="bg-transparent border-none outline-none text-emerald-800"
+                                  style={{ width: `${item.length}ch` }}
+                                />
+                                <button
+                                  onClick={() => removeSkillItem(skillCategory.id, itemIndex)}
+                                  className="ml-1.5 text-red-500 hover:text-red-700"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </span>
+                            ))}
+                            <button
+                              onClick={() => {
+                                const updatedSkills = skills.map(skill => 
+                                  skill.id === skillCategory.id 
+                                    ? { ...skill, items: [...skill.items, 'New Skill'] }
+                                    : skill
+                                );
+                                setSkills(updatedSkills);
+                              }}
+                              className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gradient-to-r from-gray-100 to-gray-200 border border-gray-300 text-gray-700 hover:text-gray-900 text-sm font-medium hover:from-gray-200 hover:to-gray-300 transition-all"
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              Add Skill
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Technologies Section */}
-              <div>
-                <h3 className="text-lg font-bold text-gray-800 mb-6">Technologies</h3>
-                
-                {editingSection === 'technologies' && (
-                  <div className="mb-6">
-                    <div className="flex gap-3 mb-4">
-                      <input
-                        type="text"
-                        value={newTechnology}
-                        onChange={(e) => setNewTechnology(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addTechnology()}
-                        placeholder="Add a technology (e.g., React, Node.js)"
-                        className="flex-1 px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 font-medium"
-                      />
-                      <button
-                        onClick={addTechnology}
-                        className="px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center font-medium"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add
-                      </button>
-                    </div>
-                    <p className="text-sm text-gray-500 mb-3">Press Enter or click Add to add a technology</p>
                   </div>
-                )}
 
-                <div className="flex flex-wrap gap-2">
-                  {technologies.map((tech, index) => (
-                    <span key={index} className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-100 to-indigo-100 border border-blue-200 text-blue-800 text-sm font-medium">
-                      <Code className="w-3 h-3 mr-1.5" />
-                      {tech}
-                      {editingSection === 'technologies' && (
+                  {/* Technologies Section */}
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-800 mb-6">Technologies</h3>
+                    
+                    {/* Add Technology Form */}
+                    <div className="mb-6">
+                      <div className="flex gap-3 mb-4">
+                        <input
+                          type="text"
+                          value={newTechnology}
+                          onChange={(e) => setNewTechnology(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && addTechnology()}
+                          placeholder="Add a technology (e.g., React, Node.js)"
+                          className="flex-1 px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 font-medium"
+                        />
                         <button
-                          onClick={() => removeTechnology(tech)}
-                          className="ml-1.5 text-red-500 hover:text-red-700"
+                          onClick={addTechnology}
+                          className="px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center font-medium"
                         >
-                          <X className="w-3 h-3" />
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add
                         </button>
-                      )}
-                    </span>
-                  ))}
-                  {technologies.length === 0 && editingSection !== 'technologies' && (
-                    <p className="text-gray-400 text-sm">No technologies added yet</p>
-                  )}
-                </div>
-              </div>
+                      </div>
+                    </div>
+
+                    {/* Technologies List */}
+                    <div className="flex flex-wrap gap-2">
+                      {technologies.map((tech, index) => (
+                        <span key={index} className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-100 to-indigo-100 border border-blue-200 text-blue-800 text-sm font-medium">
+                          <Code className="w-3 h-3 mr-1.5" />
+                          <input
+                            type="text"
+                            value={tech}
+                            onChange={(e) => {
+                              const updatedTech = [...technologies];
+                              updatedTech[index] = e.target.value;
+                              setTechnologies(updatedTech);
+                            }}
+                            className="bg-transparent border-none outline-none text-blue-800"
+                            style={{ width: `${tech.length}ch` }}
+                          />
+                          <button
+                            onClick={() => removeTechnology(tech)}
+                            className="ml-1.5 text-red-500 hover:text-red-700"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-8 flex justify-end space-x-3">
+                    <button
+                      onClick={saveSkills}
+                      className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all font-medium"
+                    >
+                      Save Skills
+                    </button>
+                    <button
+                      onClick={saveTechnologies}
+                      className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-medium"
+                    >
+                      Save Technologies
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Education & Certifications Card */}
             <div className="bg-gradient-to-br from-white to-gray-50/50 rounded-2xl shadow-xl p-6 border border-gray-200/50">
-              <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-gradient-to-r from-purple-500/20 to-pink-500/10 rounded-xl border border-purple-500/20">
                     <GraduationCap className="w-6 h-6 text-purple-600" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900">Education & Certifications</h2>
                 </div>
-                <div className="flex space-x-3">
-                  {editingSection === 'education' ? (
-                    <>
-                      <button
-                        onClick={() => setEditingSection(null)}
-                        className="px-4 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 font-medium"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={saveEducation}
-                        className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all font-medium"
-                      >
-                        Save Education
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => setEditingSection('education')}
-                      className="px-4 py-2.5 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl hover:from-gray-200 hover:to-gray-300 transition-all font-medium"
-                    >
-                      Edit Education
-                    </button>
-                  )}
-
-                  {editingSection === 'certifications' ? (
-                    <>
-                      <button
-                        onClick={() => setEditingSection(null)}
-                        className="px-4 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 font-medium"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={saveCertifications}
-                        className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-medium"
-                      >
-                        Save Certifications
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => setEditingSection('certifications')}
-                      className="px-4 py-2.5 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl hover:from-gray-200 hover:to-gray-300 transition-all font-medium"
-                    >
-                      Edit Certifications
-                    </button>
-                  )}
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => toggleSection('education')}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    {expandedSections.education ? (
+                      <ChevronUp className="w-5 h-5 text-gray-500" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-gray-500" />
+                    )}
+                  </button>
                 </div>
               </div>
 
-              {/* Education Section */}
-              <div className="mb-10">
-                <h3 className="text-lg font-bold text-gray-800 mb-6">Education</h3>
-                
-                {editingSection === 'education' && (
-                  <div className="mb-6 p-5 border border-dashed border-purple-300 rounded-xl bg-gradient-to-r from-purple-50 to-pink-50/50">
-                    <h4 className="font-bold text-gray-800 mb-4">Add Education</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <input
-                        type="text"
-                        value={newEducation.degree}
-                        onChange={(e) => setNewEducation({...newEducation, degree: e.target.value})}
-                        placeholder="Degree (e.g., B.Sc Computer Science)"
-                        className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 font-medium"
+              {expandedSections.education && (
+                <>
+                  {/* Education Section */}
+                  <div className="mb-10">
+                    <h3 className="text-lg font-bold text-gray-800 mb-6">Education</h3>
+                    
+                    {/* Add Education Form */}
+                    <div className="mb-6 p-5 border border-dashed border-purple-300 rounded-xl bg-gradient-to-r from-purple-50 to-pink-50/50">
+                      <h4 className="font-bold text-gray-800 mb-4">Add Education</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <input
+                          type="text"
+                          value={newEducation.degree}
+                          onChange={(e) => setNewEducation({...newEducation, degree: e.target.value})}
+                          placeholder="Degree (e.g., B.Sc Computer Science)"
+                          className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 font-medium"
+                        />
+                        <input
+                          type="text"
+                          value={newEducation.institution}
+                          onChange={(e) => setNewEducation({...newEducation, institution: e.target.value})}
+                          placeholder="Institution"
+                          className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 font-medium"
+                        />
+                        <input
+                          type="text"
+                          value={newEducation.year}
+                          onChange={(e) => setNewEducation({...newEducation, year: e.target.value})}
+                          placeholder="Year (e.g., 2018-2022)"
+                          className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 font-medium"
+                        />
+                      </div>
+                      <textarea
+                        value={newEducation.description}
+                        onChange={(e) => setNewEducation({...newEducation, description: e.target.value})}
+                        placeholder="Additional details, achievements, or relevant coursework..."
+                        rows={3}
+                        className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 mb-4 text-gray-800 font-medium"
                       />
-                      <input
-                        type="text"
-                        value={newEducation.institution}
-                        onChange={(e) => setNewEducation({...newEducation, institution: e.target.value})}
-                        placeholder="Institution"
-                        className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 font-medium"
-                      />
-                      <input
-                        type="text"
-                        value={newEducation.year}
-                        onChange={(e) => setNewEducation({...newEducation, year: e.target.value})}
-                        placeholder="Year (e.g., 2018-2022)"
-                        className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 font-medium"
-                      />
-                    </div>
-                    <textarea
-                      value={newEducation.description}
-                      onChange={(e) => setNewEducation({...newEducation, description: e.target.value})}
-                      placeholder="Additional details, achievements, or relevant coursework..."
-                      rows={3}
-                      className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 mb-4 text-gray-800 font-medium"
-                    />
-                    <div className="flex space-x-3">
                       <button
                         onClick={addEducation}
-                        className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all font-medium"
+                        className="w-full px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all flex items-center justify-center font-medium"
                       >
+                        <Plus className="w-4 h-4 mr-2" />
                         Add Education
                       </button>
-                      <button
-                        onClick={() => setNewEducation({ degree: '', institution: '', year: '', description: '' })}
-                        className="px-5 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 font-medium"
-                      >
-                        Clear
-                      </button>
+                    </div>
+
+                    {/* Education List */}
+                    <div className="space-y-4">
+                      {education.map((edu) => (
+                        <div key={edu.id} className="p-5 border border-gray-200 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100/50">
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex-1 space-y-2">
+                              <input
+                                type="text"
+                                value={edu.degree}
+                                onChange={(e) => updateEducationItem(edu.id, { degree: e.target.value })}
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 font-medium text-lg"
+                                placeholder="Degree"
+                              />
+                              <input
+                                type="text"
+                                value={edu.institution}
+                                onChange={(e) => updateEducationItem(edu.id, { institution: e.target.value })}
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-600 font-medium"
+                                placeholder="Institution"
+                              />
+                              <input
+                                type="text"
+                                value={edu.year}
+                                onChange={(e) => updateEducationItem(edu.id, { year: e.target.value })}
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-500"
+                                placeholder="Year"
+                              />
+                            </div>
+                            <button
+                              onClick={() => removeEducation(edu.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-4"
+                              title="Remove education"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <textarea
+                            value={edu.description}
+                            onChange={(e) => updateEducationItem(edu.id, { description: e.target.value })}
+                            rows={3}
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700"
+                            placeholder="Description"
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
-                )}
 
-                <div className="space-y-4">
-                  {education.map((edu, index) => (
-                    <div key={index} className="p-5 border border-gray-200 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100/50">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <GraduationCap className="w-5 h-5 text-purple-600" />
-                            <h4 className="font-bold text-gray-800">{edu.degree}</h4>
-                          </div>
-                          <p className="text-gray-600 mb-1 font-medium">{edu.institution}</p>
-                          <p className="text-sm text-gray-500 mb-3">{edu.year}</p>
-                          <p className="text-gray-700">{edu.description}</p>
-                        </div>
-                        {editingSection === 'education' && (
-                          <button
-                            onClick={() => removeEducation(index)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Remove education"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                  {/* Certifications Section */}
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-800 mb-6">Certifications</h3>
+                    
+                    {/* Add Certification Form */}
+                    <div className="mb-6 p-5 border border-dashed border-blue-300 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50/50">
+                      <h4 className="font-bold text-gray-800 mb-4">Add Certification</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <input
+                          type="text"
+                          value={newCertification.name}
+                          onChange={(e) => setNewCertification({...newCertification, name: e.target.value})}
+                          placeholder="Certification Name"
+                          className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 font-medium"
+                        />
+                        <input
+                          type="text"
+                          value={newCertification.issuer}
+                          onChange={(e) => setNewCertification({...newCertification, issuer: e.target.value})}
+                          placeholder="Issuing Organization"
+                          className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 font-medium"
+                        />
+                        <input
+                          type="text"
+                          value={newCertification.year}
+                          onChange={(e) => setNewCertification({...newCertification, year: e.target.value})}
+                          placeholder="Year"
+                          className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 font-medium"
+                        />
+                        <input
+                          type="url"
+                          value={newCertification.url}
+                          onChange={(e) => setNewCertification({...newCertification, url: e.target.value})}
+                          placeholder="Certificate URL"
+                          className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 font-medium"
+                        />
                       </div>
-                    </div>
-                  ))}
-                  {education.length === 0 && editingSection !== 'education' && (
-                    <div className="text-center py-8 border border-dashed border-gray-300 rounded-xl">
-                      <GraduationCap className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-gray-500">No education history added yet</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Certifications Section */}
-              <div>
-                <h3 className="text-lg font-bold text-gray-800 mb-6">Certifications</h3>
-                
-                {editingSection === 'certifications' && (
-                  <div className="mb-6 p-5 border border-dashed border-blue-300 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50/50">
-                    <h4 className="font-bold text-gray-800 mb-4">Add Certification</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <input
-                        type="text"
-                        value={newCertification.name}
-                        onChange={(e) => setNewCertification({...newCertification, name: e.target.value})}
-                        placeholder="Certification Name"
-                        className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 font-medium"
-                      />
-                      <input
-                        type="text"
-                        value={newCertification.issuer}
-                        onChange={(e) => setNewCertification({...newCertification, issuer: e.target.value})}
-                        placeholder="Issuing Organization"
-                        className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 font-medium"
-                      />
-                      <input
-                        type="text"
-                        value={newCertification.year}
-                        onChange={(e) => setNewCertification({...newCertification, year: e.target.value})}
-                        placeholder="Year"
-                        className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 font-medium"
-                      />
-                      <input
-                        type="url"
-                        value={newCertification.url}
-                        onChange={(e) => setNewCertification({...newCertification, url: e.target.value})}
-                        placeholder="Certificate URL"
-                        className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 font-medium"
-                      />
-                    </div>
-                    <div className="flex space-x-3">
                       <button
                         onClick={addCertification}
-                        className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-medium"
+                        className="w-full px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center justify-center font-medium"
                       >
+                        <Plus className="w-4 h-4 mr-2" />
                         Add Certification
                       </button>
-                      <button
-                        onClick={() => setNewCertification({ name: '', issuer: '', year: '', url: '' })}
-                        className="px-5 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 font-medium"
-                      >
-                        Clear
-                      </button>
+                    </div>
+
+                    {/* Certifications List */}
+                    <div className="space-y-4">
+                      {certifications.map((cert) => (
+                        <div key={cert.id} className="p-5 border border-gray-200 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100/50">
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex-1 space-y-2">
+                              <input
+                                type="text"
+                                value={cert.name}
+                                onChange={(e) => updateCertificationItem(cert.id, { name: e.target.value })}
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 font-medium text-lg"
+                                placeholder="Certification Name"
+                              />
+                              <input
+                                type="text"
+                                value={cert.issuer}
+                                onChange={(e) => updateCertificationItem(cert.id, { issuer: e.target.value })}
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-600 font-medium"
+                                placeholder="Issuing Organization"
+                              />
+                              <input
+                                type="text"
+                                value={cert.year}
+                                onChange={(e) => updateCertificationItem(cert.id, { year: e.target.value })}
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-500"
+                                placeholder="Year"
+                              />
+                              <input
+                                type="url"
+                                value={cert.url}
+                                onChange={(e) => updateCertificationItem(cert.id, { url: e.target.value })}
+                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-blue-600"
+                                placeholder="Certificate URL"
+                              />
+                            </div>
+                            <button
+                              onClick={() => removeCertification(cert.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-4"
+                              title="Remove certification"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                )}
 
-                <div className="space-y-4">
-                  {certifications.map((cert, index) => (
-                    <div key={index} className="p-5 border border-gray-200 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100/50">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <Award className="w-5 h-5 text-blue-600" />
-                            <h4 className="font-bold text-gray-800">{cert.name}</h4>
-                          </div>
-                          <p className="text-gray-600 mb-1 font-medium">{cert.issuer}</p>
-                          <p className="text-sm text-gray-500 mb-3">{cert.year}</p>
-                          {cert.url && (
-                            <a 
-                              href={cert.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center text-blue-600 hover:text-blue-700 hover:underline text-sm font-medium"
-                            >
-                              <ExternalLink className="w-3 h-3 mr-1" />
-                              View Certificate
-                            </a>
-                          )}
-                        </div>
-                        {editingSection === 'certifications' && (
-                          <button
-                            onClick={() => removeCertification(index)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Remove certification"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {certifications.length === 0 && editingSection !== 'certifications' && (
-                    <div className="text-center py-8 border border-dashed border-gray-300 rounded-xl">
-                      <Award className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-gray-500">No certifications added yet</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+                  <div className="mt-8 flex justify-end space-x-3">
+                    <button
+                      onClick={saveEducation}
+                      className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all font-medium"
+                    >
+                      Save Education
+                    </button>
+                    <button
+                      onClick={saveCertifications}
+                      className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-medium"
+                    >
+                      Save Certifications
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
