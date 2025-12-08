@@ -1,9 +1,9 @@
-import ProfileInfo from '@/components/ProfileInfoForm'
+import ProjectForm from '@/components/ProjectForm'
 
 const page = () => {
   return (
     <div>
-      <ProfileInfo/>
+      <ProjectForm/>
     </div>
   )
 }

@@ -41,6 +41,25 @@ export interface Project {
   createdAt: Date;
   updatedAt: Date;
 }
+export interface Project {
+  id: string;
+  title: string;
+  description: string;
+  shortDescription: string;
+  technologies: string[];
+  githubUrl?: string;
+  projectUrl?: string; // Changed from liveUrl to projectUrl
+  coverImage: string;
+  coverImagePublicId?: string;
+  screenshots: string[];
+  isFeatured: boolean;
+  status: 'completed' | 'in-progress' | 'planned';
+  complexity: 'beginner' | 'intermediate' | 'advanced';
+  featuredTechnologies: string[];
+  projectDate: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface Profile {
   id: string;
@@ -384,28 +403,28 @@ export const useAdminStore = create<AdminState>()(
       },
 
       // Project Management
-      fetchAllProjects: async () => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await fetch('/api/admin/projects', {
-            credentials: 'include'
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to fetch projects');
-          }
-          
-          const data = await response.json();
-          set({ projects: data.projects, isLoading: false });
-        } catch (error) {
-          console.error('Fetch projects error:', error);
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to fetch projects',
-            isLoading: false 
-          });
-        }
-      },
+    fetchAllProjects: async () => {
+  set({ isLoading: true, error: null });
+  try {
+    const response = await fetch('/api/admin/projects', {
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch projects');
+    }
+    
+    const data = await response.json();
+    set({ projects: data.projects, isLoading: false });
+  } catch (error) {
+    console.error('Fetch projects error:', error);
+    set({ 
+      error: error instanceof Error ? error.message : 'Failed to fetch projects',
+      isLoading: false 
+    });
+  }
+},
 
       fetchProjectsByStatus: async (status) => {
         set({ isLoading: true, error: null });
@@ -430,106 +449,104 @@ export const useAdminStore = create<AdminState>()(
         }
       },
 
-      createProject: async (projectData) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await fetch('/api/admin/projects', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify(projectData),
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to create project');
-          }
-          
-          const data = await response.json();
-          
-          const { projects } = get();
-          set({ 
-            projects: [data.project, ...projects], 
-            isLoading: false 
-          });
-          
-          return data.project;
-        } catch (error) {
-          console.error('Create project error:', error);
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to create project',
-            isLoading: false 
-          });
-          throw error;
-        }
+     createProject: async (projectData) => {
+  set({ isLoading: true, error: null });
+  try {
+    const response = await fetch('/api/admin/projects', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
+      credentials: 'include',
+      body: JSON.stringify(projectData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create project');
+    }
+    
+    const data = await response.json();
+    
+    const { projects } = get();
+    set({ 
+      projects: [data.project, ...projects], 
+      isLoading: false 
+    });
+    
+    return data.project;
+  } catch (error) {
+    console.error('Create project error:', error);
+    set({ 
+      error: error instanceof Error ? error.message : 'Failed to create project',
+      isLoading: false 
+    });
+    throw error;
+  }
+},
 
-      updateProject: async (projectId: string, updates: Partial<Project>) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await fetch(`/api/admin/projects/${projectId}`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify(updates),
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to update project');
-          }
-          
-          const data = await response.json();
-          
-          const { projects } = get();
-          const updatedProjects = projects.map(project => 
-            project.id === projectId ? { ...project, ...updates, updatedAt: new Date() } : project
-          );
-          
-          set({ projects: updatedProjects, isLoading: false });
-          
-          return data.project;
-        } catch (error) {
-          console.error('Update project error:', error);
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to update project',
-            isLoading: false 
-          });
-          throw error;
-        }
+     updateProject: async (projectId: string, updates: Partial<Project>) => {
+  set({ isLoading: true, error: null });
+  try {
+    const response = await fetch(`/api/admin/projects/${projectId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
       },
-
-      deleteProject: async (projectId: string) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await fetch(`/api/admin/projects/${projectId}`, {
-            method: 'DELETE',
-            credentials: 'include',
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to delete project');
-          }
-          
-          const { projects } = get();
-          const updatedProjects = projects.filter(project => project.id !== projectId);
-          
-          set({ projects: updatedProjects, isLoading: false });
-        } catch (error) {
-          console.error('Delete project error:', error);
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to delete project',
-            isLoading: false 
-          });
-          throw error;
-        }
-      },
-
+      credentials: 'include',
+      body: JSON.stringify(updates),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update project');
+    }
+    
+    const data = await response.json();
+    
+    const { projects } = get();
+    const updatedProjects = projects.map(project => 
+      project.id === projectId ? { ...project, ...updates, updatedAt: new Date() } : project
+    );
+    
+    set({ projects: updatedProjects, isLoading: false });
+    
+    return data.project;
+  } catch (error) {
+    console.error('Update project error:', error);
+    set({ 
+      error: error instanceof Error ? error.message : 'Failed to update project',
+      isLoading: false 
+    });
+    throw error;
+  }
+},
+     deleteProject: async (projectId: string) => {
+  set({ isLoading: true, error: null });
+  try {
+    const response = await fetch(`/api/admin/projects/${projectId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to delete project');
+    }
+    
+    const { projects } = get();
+    const updatedProjects = projects.filter(project => project.id !== projectId);
+    
+    set({ projects: updatedProjects, isLoading: false });
+  } catch (error) {
+    console.error('Delete project error:', error);
+    set({ 
+      error: error instanceof Error ? error.message : 'Failed to delete project',
+      isLoading: false 
+    });
+    throw error;
+  }
+},
       // Profile Management
       fetchProfile: async () => {
         set({ isLoading: true, error: null });
@@ -1062,6 +1079,7 @@ export const useAdminStore = create<AdminState>()(
           throw error;
         }
       },
+
 
       // Utility Functions
       clearError: () => set({ error: null }),
