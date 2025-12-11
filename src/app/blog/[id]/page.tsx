@@ -44,7 +44,7 @@ export default async function BlogPostPage({ params }: PageProps) {
   const { id } = await params;
   
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ;
     const apiUrl = `${baseUrl}/api/posts/${id}`;
     
     const response = await fetch(apiUrl, {
@@ -261,7 +261,7 @@ export default async function BlogPostPage({ params }: PageProps) {
 // Generate static params
 export async function generateStaticParams() {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ;
     const apiUrl = `${baseUrl}/api/posts`;
     
     const response = await fetch(apiUrl, { 
@@ -295,7 +295,7 @@ export async function generateMetadata({ params }: PageProps) {
   const { id } = await params;
   
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ;
     const response = await fetch(`${baseUrl}/api/posts/${id}`);
     
     if (!response.ok) {
