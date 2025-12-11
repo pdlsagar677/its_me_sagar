@@ -59,38 +59,39 @@ const HomePage = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch profile and projects data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Fetch profile
-        const profileRes = await fetch('/api/profile');
-        if (profileRes.ok) {
-          const profileData = await profileRes.json();
-          if (profileData.success) {
-            setProfile(profileData.profile);
-          }
+ useEffect(() => {
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch profile
+      const profileRes = await fetch('/api/profile');
+      if (profileRes.ok) {
+        const profileData = await profileRes.json();
+        if (profileData.success) {
+          setProfile(profileData.profile);
         }
-        
-        // Fetch projects
-        const projectsRes = await fetch('/api/projects?featured=true&limit=6');
-        if (projectsRes.ok) {
-          const projectsData = await projectsRes.json();
-          if (projectsData.success) {
-            setProjects(projectsData.projects);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setIsLoading(false);
       }
-    };
+      
+      // Fetch projects - Get only 3
+      const projectsRes = await fetch('/api/projects?limit=3');
+      if (projectsRes.ok) {
+        const projectsData = await projectsRes.json();
+        if (projectsData.success) {
+          // Take only first 3 projects
+          const limitedProjects = projectsData.projects.slice(0, 3);
+          setProjects(limitedProjects);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    fetchData();
-  }, []);
-
+  fetchData();
+}, []);
   // Navigation functions
   const viewProjectDetails = (projectId: string) => {
     router.push(`/projects/${projectId}`);
