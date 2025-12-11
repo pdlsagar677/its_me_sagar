@@ -335,47 +335,88 @@ export const profileService = {
     }
   },
 
-  // Upload CV/Resume
-  async uploadCV(fileBuffer: Buffer, fileName: string): Promise<{ success: boolean; profile?: Profile; error?: string }> {
-    try {
-      const { db } = await connectToDatabase();
-      
-      // Get current profile to delete old CV
-      const currentProfile = await db.collection<Profile>(PROFILE_COLLECTION).findOne({});
-      if (currentProfile?.cvPublicId) {
-        try {
-          await cloudinaryService.deleteImage(currentProfile.cvPublicId);
-        } catch (error) {
-          console.error('Error deleting old CV:', error);
-        }
+
+// Upload CV/Resume - FIXED VERSION WITH INLINE PREVIEW
+async uploadCV(fileBuffer: Buffer, fileName: string): Promise<{ success: boolean; profile?: Profile; error?: string }> {
+  try {
+    const { db } = await connectToDatabase();
+    
+    // Get current profile to delete old CV
+    const currentProfile = await db.collection<Profile>(PROFILE_COLLECTION).findOne({});
+    if (currentProfile?.cvPublicId) {
+      try {
+        // Use deleteDocument for raw files
+        await cloudinaryService.deleteDocument(currentProfile.cvPublicId);
+      } catch (error) {
+        console.error('Error deleting old CV:', error);
       }
-      
-      // Upload CV to Cloudinary (PDF support)
-      const uploadResult = await cloudinaryService.uploadImage(fileBuffer, 'portfolio/cv');
-      
-      // Update profile with new CV
-      const result = await db.collection<Profile>(PROFILE_COLLECTION).findOneAndUpdate(
-        {},
-        { 
-          $set: { 
-            cvUrl: uploadResult.secure_url,
-            cvPublicId: uploadResult.public_id,
-            updatedAt: new Date()
-          } 
-        },
-        { returnDocument: 'after' }
-      );
-      
-      if (!result) {
-        return { success: false, error: 'Profile not found' };
-      }
-      
-      return { success: true, profile: result };
-    } catch (error) {
-      console.error('Error uploading CV:', error);
-      return { success: false, error: 'Failed to upload CV' };
     }
-  },
+    
+    // Upload CV to Cloudinary using uploadDocument with inline flag
+    const uploadResult = await cloudinaryService.uploadDocument(fileBuffer, 'portfolio/cv');
+    
+    // Transform URL to support inline viewing (fl_attachment changes to no flags)
+    // The secure_url from Cloudinary should work for inline viewing by default
+    let viewableUrl = uploadResult.secure_url;
+    
+    // Update profile with new CV
+    const result = await db.collection<Profile>(PROFILE_COLLECTION).findOneAndUpdate(
+      {},
+      { 
+        $set: { 
+          cvUrl: viewableUrl,
+          cvPublicId: uploadResult.public_id,
+          updatedAt: new Date()
+        } 
+      },
+      { returnDocument: 'after' }
+    );
+    
+    if (!result) {
+      return { success: false, error: 'Profile not found' };
+    }
+    
+    return { success: true, profile: result };
+  } catch (error) {
+    console.error('Error uploading CV:', error);
+    return { success: false, error: 'Failed to upload CV' };
+  }
+},
+
+// Delete CV - FIXED VERSION
+async deleteCV(): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { db } = await connectToDatabase();
+    
+    const currentProfile = await db.collection<Profile>(PROFILE_COLLECTION).findOne({});
+    
+    if (!currentProfile) {
+      return { success: false, error: 'Profile not found' };
+    }
+    
+    if (currentProfile.cvPublicId) {
+      // Use deleteDocument for raw files
+      await cloudinaryService.deleteDocument(currentProfile.cvPublicId);
+    }
+    
+    const result = await db.collection<Profile>(PROFILE_COLLECTION).findOneAndUpdate(
+      {},
+      { 
+        $set: { 
+          cvUrl: '',
+          cvPublicId: '',
+          updatedAt: new Date()
+        } 
+      }
+    );
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting CV:', error);
+    return { success: false, error: 'Failed to delete CV' };
+  }
+},
+
 
   // Update Social Links
   async updateSocialLinks(socialLinks: Partial<Profile['socialLinks']>): Promise<{ success: boolean; profile?: Profile; error?: string }> {
@@ -632,36 +673,5 @@ export const profileService = {
     }
   },
 
-  // Delete CV
-  async deleteCV(): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { db } = await connectToDatabase();
-      
-      const currentProfile = await db.collection<Profile>(PROFILE_COLLECTION).findOne({});
-      
-      if (!currentProfile) {
-        return { success: false, error: 'Profile not found' };
-      }
-      
-      if (currentProfile.cvPublicId) {
-        await cloudinaryService.deleteImage(currentProfile.cvPublicId);
-      }
-      
-      const result = await db.collection<Profile>(PROFILE_COLLECTION).findOneAndUpdate(
-        {},
-        { 
-          $set: { 
-            cvUrl: '',
-            cvPublicId: '',
-            updatedAt: new Date()
-          } 
-        }
-      );
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Error deleting CV:', error);
-      return { success: false, error: 'Failed to delete CV' };
-    }
-  }
+ 
 };

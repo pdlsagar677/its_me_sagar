@@ -7,68 +7,75 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-export interface CloudinaryUploadResult {
-  public_id: string;
-  secure_url: string;
-  url: string;
-  width: number;
-  height: number;
-  format: string;
-  resource_type: string;
-  bytes: number;
-}
-
 export const cloudinaryService = {
-  // Upload image to Cloudinary
-  async uploadImage(file: Buffer | string, folder: string = 'blog-posts'): Promise<CloudinaryUploadResult> {
-    try {
-      const result = await cloudinary.uploader.upload(
-        typeof file === 'string' ? file : `data:image/jpeg;base64,${file.toString('base64')}`,
+  // Upload Image
+  async uploadImage(buffer: Buffer, folder: string = 'portfolio'): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder,
+          folder: folder,
           resource_type: 'image',
-          transformation: [
-            { width: 1200, height: 630, crop: 'limit' },
-            { quality: 'auto' },
-            { format: 'webp' }
-          ]
+          allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'],
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
         }
       );
 
-      return result;
-    } catch (error) {
-      console.error('❌ Cloudinary upload error:', error);
-      throw new Error('Failed to upload image to Cloudinary');
-    }
+      uploadStream.end(buffer);
+    });
   },
 
-  // Delete image from Cloudinary
-  async deleteImage(publicId: string): Promise<boolean> {
-    try {
-      await cloudinary.uploader.destroy(publicId);
-      return true;
-    } catch (error) {
-      console.error('❌ Cloudinary delete error:', error);
-      throw new Error('Failed to delete image from Cloudinary');
-    }
+  // Upload PDF/Document - UPDATED FOR INLINE VIEWING
+  async uploadDocument(buffer: Buffer, folder: string = 'portfolio'): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: folder,
+          resource_type: 'raw', // Important: use 'raw' for PDFs and documents
+          allowed_formats: ['pdf', 'doc', 'docx'],
+          access_mode: 'public', // Ensure public access
+          // No flags needed - Cloudinary serves PDFs inline by default
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+
+      uploadStream.end(buffer);
+    });
   },
 
-  // Extract public ID from Cloudinary URL
-  getPublicIdFromUrl(url: string): string | null {
+  // Delete Image
+  async deleteImage(publicId: string): Promise<any> {
     try {
-      const urlParts = url.split('/');
-      const filename = urlParts[urlParts.length - 1];
-      const publicId = filename.split('.')[0];
-      const folderParts = urlParts.slice(urlParts.indexOf('upload') + 1, -1);
+      // Try deleting as image first
+      const imageResult = await cloudinary.uploader.destroy(publicId, {
+        resource_type: 'image',
+      });
       
-      if (folderParts.length > 0) {
-        return `${folderParts.join('/')}/${publicId}`;
+      if (imageResult.result === 'ok') {
+        return imageResult;
       }
       
-      return publicId;
+      // If not found as image, try as raw (for PDFs)
+      const rawResult = await cloudinary.uploader.destroy(publicId, {
+        resource_type: 'raw',
+      });
+      
+      return rawResult;
     } catch (error) {
-      console.error('❌ Error extracting public ID:', error);
-      return null;
+      console.error('Error deleting from Cloudinary:', error);
+      throw error;
     }
-  }
+  },
+
+  // Delete Document - NEW METHOD
+  async deleteDocument(publicId: string): Promise<any> {
+    return cloudinary.uploader.destroy(publicId, {
+      resource_type: 'raw',
+    });
+  },
 };

@@ -331,18 +331,31 @@ const ProfilePage = () => {
                   )}
                 </div>
 
-                {/* CV Download Button */}
-                {profile.cvUrl && (
-                  <a
-                    href={profile.cvUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full mb-8 px-6 py-4 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-xl transition-all flex items-center justify-center font-medium group"
-                  >
-                    <Download className="w-5 h-5 mr-2 group-hover:animate-bounce" />
-                    Download CV/Resume
-                  </a>
-                )}
+             
+{/* CV Preview/Download Buttons */}
+{profile.cvUrl && (
+  <div className="space-y-3 mb-8">
+    {/* View CV Button - Opens in browser using same route with action=cv */}
+    <a
+      href="/api/profile?action=cv"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="w-full px-6 py-4 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-xl transition-all flex items-center justify-center font-medium group"
+    >
+      <FileText className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+      View CV/Resume
+    </a>
+    
+    {/* Download CV Button - Forces download using same route */}
+    <a
+      href="/api/profile?action=cv&download=true"
+      className="w-full px-6 py-4 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white rounded-xl transition-all flex items-center justify-center font-medium group border border-gray-600"
+    >
+      <Download className="w-5 h-5 mr-2 group-hover:animate-bounce" />
+      Download CV
+    </a>
+  </div>
+)}
 
                 {/* Social Links - Improved visibility */}
                 <div className="mb-4">
