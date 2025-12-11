@@ -1,46 +1,109 @@
 "use client";
 
-import React from 'react';
-import { 
-  Github, 
-  Linkedin, 
-  Twitter, 
-  Mail, 
-  Heart, 
+import React, { useEffect, useState } from "react";
+import {
+  Github,
+  Linkedin,
+  Twitter,
+  Mail,
   Sparkles,
   ArrowUp,
-  Copyright
-} from 'lucide-react';
+  Copyright,
+  Globe,
+} from "lucide-react";
+
+// Profile interface
+interface Profile {
+  socialLinks: {
+    github: string;
+    linkedin: string;
+    twitter: string;
+    website: string;
+    email: string;
+  };
+}
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch profile data to get social links
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch("/api/profile");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.profile) {
+            setProfile(data.profile);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching profile for footer:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
 
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // Get social links from profile or use fallbacks
   const socialLinks = [
-    { icon: Github, href: '#', label: 'GitHub' },
-    { icon: Linkedin, href: '#', label: 'LinkedIn' },
-    { icon: Twitter, href: '#', label: 'Twitter' },
-    { icon: Mail, href: '#', label: 'Email' },
-  ];
+    {
+      icon: Github,
+      href: profile?.socialLinks?.github || "#",
+      label: "GitHub",
+      color: "hover:text-white hover:border-white/50",
+    },
+    {
+      icon: Linkedin,
+      href: profile?.socialLinks?.linkedin || "#",
+      label: "LinkedIn",
+      color: "hover:text-blue-400 hover:border-blue-500/50",
+    },
+    {
+      icon: Twitter,
+      href: profile?.socialLinks?.twitter || "#",
+      label: "Twitter",
+      color: "hover:text-blue-300 hover:border-blue-400/50",
+    },
+    {
+      icon: Globe,
+      href: profile?.socialLinks?.website || "#",
+      label: "Website",
+      color: "hover:text-emerald-400 hover:border-emerald-500/50",
+    },
+    {
+      icon: Mail,
+      href: profile?.socialLinks?.email
+        ? `mailto:${profile.socialLinks.email}`
+        : "#",
+      label: "Email",
+      color: "hover:text-orange-400 hover:border-orange-500/50",
+    },
+  ].filter((link) => link.href !== "#"); // Remove empty links
 
   const quickLinks = [
-    { label: 'Home', href: '#' },
-    { label: 'Projects', href: '#' },
-    { label: 'Blog', href: '#' },
-    { label: 'Contact', href: '#' },
+    { label: "Home", href: "/" },
+    { label: "Blog", href: "/blog" },
+
+    { label: "Projects", href: "/projects" },
+    { label: "Profile", href: "/profile" },
   ];
 
   return (
     <footer className="relative bg-gray-900 border-t border-gray-800 mt-20">
       {/* Gradient accent line */}
       <div className="h-0.5 bg-gradient-to-r from-transparent via-orange-500/50 to-transparent"></div>
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex flex-col md:flex-row justify-between items-center space-y-8 md:space-y-0">
-          
           {/* Logo & Brand */}
           <div className="flex flex-col items-center md:items-start space-y-4">
             <div className="flex items-center space-x-3">
@@ -51,60 +114,59 @@ const Footer = () => {
                 <span className="text-xl font-bold bg-gradient-to-r from-orange-400 to-orange-300 bg-clip-text text-transparent">
                   SAGAR
                 </span>
-                <span className="text-sm text-gray-400">Full Stack Engineer</span>
+                <span className="text-sm text-gray-400">
+                  Full Stack Engineer
+                </span>
               </div>
             </div>
-            
+
             <p className="text-gray-500 text-sm max-w-xs text-center md:text-left">
-              Crafting digital experiences with modern technologies and clean design.
+              Crafting digital experiences with modern technologies and clean
+              design.
             </p>
           </div>
 
-          {/* Quick Links */}
-          <div className="flex flex-col items-center md:items-end space-y-4">
+          {/* Quick Links & Social Links */}
+          <div className="flex flex-col items-center md:items-end space-y-6">
+            {/* Quick Links */}
             <div className="flex flex-wrap justify-center gap-4">
               {quickLinks.map((link) => (
                 <a
                   key={link.label}
                   href={link.href}
-                  className="text-gray-400 hover:text-orange-300 transition-colors duration-300 text-sm font-medium"
+                  className="text-gray-400 hover:text-orange-300 transition-colors duration-300 text-sm font-medium px-2 py-1 rounded-lg hover:bg-gray-800/30"
                 >
                   {link.label}
                 </a>
               ))}
             </div>
-            
-            {/* Social Links */}
-            <div className="flex items-center space-x-4">
-              {socialLinks.map((social) => (
-                <a
-                  key={social.label}
-                  href={social.href}
-                  className="w-10 h-10 rounded-xl bg-gray-800/50 flex items-center justify-center text-gray-400 hover:text-orange-300 hover:bg-gray-800 transition-all duration-300 border border-gray-700/50 hover:border-orange-500/30 group"
-                  aria-label={social.label}
-                >
-                  <social.icon className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                </a>
-              ))}
+
+            {/* Social Links - Only show if we have data */}
+            {!isLoading && socialLinks.length > 0 && (
+              <div className="flex items-center space-x-3">
+                {socialLinks.map((social) => (
+                  <a
+                    key={social.label}
+                    href={social.href}
+                    target={social.label !== "Email" ? "_blank" : "_self"}
+                    rel={social.label !== "Email" ? "noopener noreferrer" : ""}
+                    className={`w-9 h-9 rounded-xl bg-gray-800/50 flex items-center justify-center text-gray-400 border border-gray-700/50 transition-all duration-300 group ${social.color}`}
+                    aria-label={social.label}
+                    title={social.label}
+                  >
+                    <social.icon className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* Copyright */}
+            <div className="text-center md:text-right">
+              <p className="text-gray-500 text-sm flex items-center justify-center md:justify-end">
+                <Copyright className="w-3 h-3 mr-1" />
+                {currentYear} Made with by Sagar
+              </p>
             </div>
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div className="h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent my-8"></div>
-
-        {/* Bottom Bar */}
-        <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-          <div className="flex items-center space-x-2 text-gray-500 text-sm">
-            <Copyright className="w-4 h-4" />
-            <span>{currentYear} Portfolio. All rights reserved.</span>
-          </div>
-          
-          <div className="flex items-center space-x-2 text-gray-500 text-sm">
-            <span>Made with</span>
-            <Heart className="w-4 h-4 text-orange-500 animate-pulse" />
-            <span>by</span>
-            <span className="text-orange-300 font-medium">Developer</span>
           </div>
         </div>
       </div>
