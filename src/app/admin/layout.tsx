@@ -13,11 +13,8 @@ import {
   Menu,
   X,
   ChevronRight,
-  Sparkles,
   Home,
-  UserCheckIcon,
   UserCircle2,
-  FolderArchive,
   FolderCheckIcon,
 } from "lucide-react";
 
@@ -35,9 +32,11 @@ export default function AdminLayout({
   useEffect(() => {
     checkAuth();
 
-    // Check if mobile
+    // Check if mobile and set initial sidebar state
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      setSidebarOpen(!mobile); // open on desktop, closed on mobile
     };
 
     checkMobile();
@@ -47,21 +46,49 @@ export default function AdminLayout({
   }, [checkAuth]);
 
   useEffect(() => {
+    // Guard: if authenticated but not admin, redirect
     if (user && !user.isAdmin) {
       router.push("/unauthorized");
     }
   }, [user, router]);
 
+  // Close sidebar when route changes (only), and only on mobile
   useEffect(() => {
-    // Close sidebar on navigation on mobile
-    if (sidebarOpen && isMobile) {
+    if (isMobile) {
       setSidebarOpen(false);
     }
-  }, [pathname, sidebarOpen, isMobile]);
+    // only depend on pathname and isMobile so toggling sidebar doesn't immediately close it
+  }, [pathname, isMobile]);
+
+  // Close on Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && sidebarOpen && isMobile) {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sidebarOpen, isMobile]);
+
+  // Lock body scroll when mobile sidebar open
+  useEffect(() => {
+    if (isMobile && sidebarOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [isMobile, sidebarOpen]);
 
   const handleLogout = async () => {
     await logout();
     router.push("/");
+  };
+
+  const toggleSidebar = () => {
+    setSidebarOpen((s) => !s);
   };
 
   if (isLoading) {
@@ -105,37 +132,75 @@ export default function AdminLayout({
       icon: UserCircle2,
       path: "/admin/profileinfo",
     },
-
     { id: "profile", label: "Profile", icon: User, path: "/admin/profile" },
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950">
+      {/* Top Header with Menu Toggle (mobile only) */}
+      <header className="sticky top-0 z-50 bg-gray-800/80 backdrop-blur-lg border-b border-gray-700/50 md:hidden">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={toggleSidebar}
+              aria-label={sidebarOpen ? "Close menu" : "Open menu"}
+              aria-expanded={sidebarOpen}
+              className="p-2 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors"
+            >
+              {sidebarOpen ? (
+                <X className="w-5 h-5 text-white" />
+              ) : (
+                <Menu className="w-5 h-5 text-white" />
+              )}
+            </button>
+            <h1 className="text-white font-bold">Admin Dashboard</h1>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center">
+              <User className="w-4 h-4 text-gray-900" />
+            </div>
+            <span className="text-sm text-gray-300 truncate max-w-[100px]">
+              {user.username}
+            </span>
+          </div>
+        </div>
+      </header>
+
       <div className="flex">
         {/* Sidebar */}
         <aside
           className={`
-          fixed md:relative z-40 w-64 h-[calc(100vh-4rem)] bg-gray-800/50 backdrop-blur-lg border-r border-gray-700/50
-          transform transition-transform duration-300 ease-in-out
-          ${
-            sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } md:translate-x-0
-          md:flex md:flex-col
-        `}
+            fixed md:sticky top-0 md:top-4 left-0 z-40 w-64 h-screen md:h-[calc(100vh-2rem)]
+            bg-gray-800/90 backdrop-blur-lg border-r border-gray-700/50
+            transform transition-transform duration-300 ease-in-out
+            ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+            md:translate-x-0 md:ml-4 md:my-4 md:rounded-xl
+            md:h-[calc(100vh-2rem)] flex flex-col
+          `}
         >
+          {/* Close button for mobile */}
+          <div className="flex items-center justify-between p-4 md:hidden border-b border-gray-700/50">
+            <h2 className="text-white font-bold text-lg">Menu</h2>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"
+              aria-label="Close menu"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
+
           {/* User Profile Card */}
-          <div className="p-6 border-b border-gray-700/50">
+          <div className="p-6 border-b border-gray-700/50 md:mt-0">
             <div className="flex items-center space-x-3">
               <div className="relative">
                 <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
                   <User className="w-6 h-6 text-gray-900" />
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-800"></div>
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-800" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-white truncate">
-                  {user.username}
-                </h3>
+                <h3 className="font-bold text-white truncate">{user.username}</h3>
                 <p className="text-sm text-orange-400">Administrator</p>
                 <p className="text-xs text-gray-400 truncate">{user.email}</p>
               </div>
@@ -161,7 +226,9 @@ export default function AdminLayout({
                           : "text-gray-400 hover:text-white hover:bg-gray-700/50 border border-transparent"
                       }
                     `}
-                    onClick={() => setSidebarOpen(false)}
+                    onClick={() => {
+                      if (isMobile) setSidebarOpen(false);
+                    }}
                   >
                     <Icon
                       className={`w-5 h-5 ${isActive ? "text-orange-400" : ""}`}
@@ -189,7 +256,9 @@ export default function AdminLayout({
               <Link
                 href="/"
                 className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-orange-500/10 to-amber-500/5 border border-orange-500/20 rounded-xl text-orange-300 hover:bg-orange-500/20 transition-colors"
-                onClick={() => setSidebarOpen(false)}
+                onClick={() => {
+                  if (isMobile) setSidebarOpen(false);
+                }}
               >
                 <Home className="w-4 h-4 mr-2" />
                 View Portfolio
@@ -201,15 +270,16 @@ export default function AdminLayout({
         {/* Main Content */}
         <main
           className={`
-          flex-1 p-4 md:p-6 overflow-y-auto h-[calc(100vh-4rem)]
-          transition-all duration-300
-          ${sidebarOpen ? "ml-64 md:ml-0" : "ml-0"}
-        `}
+            flex-1 p-4 md:p-6 overflow-y-auto min-h-screen
+            ${isMobile ? "pt-16" : "md:pt-4"}
+            ${sidebarOpen && isMobile ? "opacity-50" : "opacity-100"}
+            transition-opacity duration-300
+          `}
         >
           {/* Backdrop for mobile sidebar */}
-          {sidebarOpen && (
+          {sidebarOpen && isMobile && (
             <div
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 md:hidden"
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30"
               onClick={() => setSidebarOpen(false)}
             />
           )}
