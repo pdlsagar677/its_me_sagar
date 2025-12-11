@@ -36,10 +36,10 @@ const PortfolioNavbar = () => {
       href: '/service' 
     },
     { 
-      id: 'contact', 
-      label: 'Contact', 
+      id: 'projects', 
+      label: 'Projects', 
       icon: Mail, 
-      href: '/contact' 
+      href: '/projects' 
     },
     { 
       id: 'profile', 
