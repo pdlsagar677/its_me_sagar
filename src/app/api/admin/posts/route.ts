@@ -31,9 +31,16 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') as 'published' | 'draft' | 'featured' | null;
 
     let posts;
-    if (status) {
+    
+    if (status === 'featured') {
+      // Get all posts and filter for featured ones
+      const allPosts = await postService.getAllPosts();
+      posts = allPosts.filter(post => post.isFeatured === true);
+    } else if (status === 'published' || status === 'draft') {
+      // Handle published/draft posts with correct type
       posts = await postService.getPostsByStatus(status);
     } else {
+      // Get all posts if no status specified
       posts = await postService.getAllPosts();
     }
 
@@ -84,6 +91,9 @@ export async function POST(request: NextRequest) {
     const postData = {
       title: formData.title as string,
       content: formData.content as string,
+      description: (formData.description as string) || 
+                   (formData.excerpt as string) || 
+                   (formData.content as string).substring(0, 200) + '...',
       excerpt: (formData.excerpt as string) || 
                (formData.content as string).substring(0, 150) + '...',
       coverImage: coverImageUrl,

@@ -1,12 +1,6 @@
-// app/profile/[id]/page.tsx
+// app/profile/page.tsx
 import ProfileDisplay from '@/components/ProfileDisplay';
 
-interface ProfilePageProps {
-  params: {
-    id: string;
-  };
-}
-
-export default function ProfilePage({ params }: ProfilePageProps) {
-  return <ProfileDisplay profileId={params.id} />;
+export default function ProfilePage() {
+  return <ProfileDisplay />;
 }

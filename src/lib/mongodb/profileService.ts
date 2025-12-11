@@ -417,33 +417,45 @@ async deleteCV(): Promise<{ success: boolean; error?: string }> {
   }
 },
 
-
-  // Update Social Links
-  async updateSocialLinks(socialLinks: Partial<Profile['socialLinks']>): Promise<{ success: boolean; profile?: Profile; error?: string }> {
-    try {
-      const { db } = await connectToDatabase();
-      
-      const result = await db.collection<Profile>(PROFILE_COLLECTION).findOneAndUpdate(
-        {},
-        { 
-          $set: { 
-            'socialLinks': socialLinks,
-            updatedAt: new Date() 
-          } 
-        },
-        { returnDocument: 'after' }
-      );
-      
-      if (!result) {
-        return { success: false, error: 'Profile not found' };
-      }
-      
-      return { success: true, profile: result };
-    } catch (error) {
-      console.error('Error updating social links:', error);
-      return { success: false, error: 'Failed to update social links' };
+// Update Social Links - FIXED VERSION
+async updateSocialLinks(socialLinks: Partial<Profile['socialLinks']>): Promise<{ success: boolean; profile?: Profile; error?: string }> {
+  try {
+    const { db } = await connectToDatabase();
+    
+    // Get current profile to merge with existing social links
+    const currentProfile = await db.collection<Profile>(PROFILE_COLLECTION).findOne({});
+    
+    if (!currentProfile) {
+      return { success: false, error: 'Profile not found' };
     }
-  },
+    
+    // Merge existing social links with new updates
+    const updatedSocialLinks = {
+      ...currentProfile.socialLinks,
+      ...socialLinks
+    };
+    
+    const result = await db.collection<Profile>(PROFILE_COLLECTION).findOneAndUpdate(
+      {},
+      { 
+        $set: { 
+          socialLinks: updatedSocialLinks,
+          updatedAt: new Date() 
+        } 
+      },
+      { returnDocument: 'after' }
+    );
+    
+    if (!result) {
+      return { success: false, error: 'Profile not found' };
+    }
+    
+    return { success: true, profile: result };
+  } catch (error) {
+    console.error('Error updating social links:', error);
+    return { success: false, error: 'Failed to update social links' };
+  }
+},
 
   // Update Skills
   async updateSkills(skills: Profile['skills']): Promise<{ success: boolean; profile?: Profile; error?: string }> {
@@ -499,33 +511,45 @@ async deleteCV(): Promise<{ success: boolean; error?: string }> {
     }
   },
 
-  // Update Experience
-  async updateExperience(experience: Partial<Profile['experience']>): Promise<{ success: boolean; profile?: Profile; error?: string }> {
-    try {
-      const { db } = await connectToDatabase();
-      
-      const result = await db.collection<Profile>(PROFILE_COLLECTION).findOneAndUpdate(
-        {},
-        { 
-          $set: { 
-            experience: experience,
-            updatedAt: new Date() 
-          } 
-        },
-        { returnDocument: 'after' }
-      );
-      
-      if (!result) {
-        return { success: false, error: 'Profile not found' };
-      }
-      
-      return { success: true, profile: result };
-    } catch (error) {
-      console.error('Error updating experience:', error);
-      return { success: false, error: 'Failed to update experience' };
+// Update Experience 
+async updateExperience(experience: Partial<Profile['experience']>): Promise<{ success: boolean; profile?: Profile; error?: string }> {
+  try {
+    const { db } = await connectToDatabase();
+    
+    // Get current profile to merge with existing experience
+    const currentProfile = await db.collection<Profile>(PROFILE_COLLECTION).findOne({});
+    
+    if (!currentProfile) {
+      return { success: false, error: 'Profile not found' };
     }
-  },
-
+    
+    // Merge existing experience with new updates
+    const updatedExperience = {
+      ...currentProfile.experience,
+      ...experience
+    };
+    
+    const result = await db.collection<Profile>(PROFILE_COLLECTION).findOneAndUpdate(
+      {},
+      { 
+        $set: { 
+          experience: updatedExperience,
+          updatedAt: new Date() 
+        } 
+      },
+      { returnDocument: 'after' }
+    );
+    
+    if (!result) {
+      return { success: false, error: 'Profile not found' };
+    }
+    
+    return { success: true, profile: result };
+  } catch (error) {
+    console.error('Error updating experience:', error);
+    return { success: false, error: 'Failed to update experience' };
+  }
+},
   // Update Education
   async updateEducation(education: Profile['education']): Promise<{ success: boolean; profile?: Profile; error?: string }> {
     try {

@@ -25,15 +25,20 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const status = searchParams.get('status');
+    const statusParam = searchParams.get('status');
     const featured = searchParams.get('featured');
+    
+    // Type-safe status validation
+    const status = statusParam && ['completed', 'in-progress', 'planned'].includes(statusParam)
+      ? (statusParam as 'completed' | 'in-progress' | 'planned')
+      : undefined;
     
     let result;
     
     if (featured === 'true') {
       result = await projectService.getFeaturedProjects();
     } else {
-      result = await projectService.getAllProjects(status || undefined);
+      result = await projectService.getAllProjects(status);
     }
     
     if (!result.success) {

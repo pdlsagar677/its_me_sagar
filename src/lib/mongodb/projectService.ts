@@ -59,24 +59,23 @@ export const generateProjectId = (): string => {
 };
 
 export const projectService = {
-  // Get all projects
-  async getAllProjects(status?: string): Promise<{ success: boolean; projects?: Project[]; error?: string }> {
-    try {
-      const { db } = await connectToDatabase();
-      
-      const query = status ? { status } : {};
-      const projects = await db.collection<Project>(PROJECTS_COLLECTION)
-        .find(query)
-        .sort({ createdAt: -1 })
-        .toArray();
-      
-      return { success: true, projects };
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-      return { success: false, error: 'Failed to fetch projects' };
-    }
-  },
-
+// Get all projects
+async getAllProjects(status?: 'completed' | 'in-progress' | 'planned'): Promise<{ success: boolean; projects?: Project[]; error?: string }> {
+  try {
+    const { db } = await connectToDatabase();
+    
+    const query = status ? { status } : {};
+    const projects = await db.collection<Project>(PROJECTS_COLLECTION)
+      .find(query)
+      .sort({ createdAt: -1 })
+      .toArray();
+    
+    return { success: true, projects };
+  } catch (error) {
+    console.error('Error fetching projects:', error);
+    return { success: false, error: 'Failed to fetch projects' };
+  }
+},
   // Get featured projects
   async getFeaturedProjects(): Promise<{ success: boolean; projects?: Project[]; error?: string }> {
     try {
