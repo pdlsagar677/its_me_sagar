@@ -8,6 +8,7 @@ interface MongoDBProfile {
   email?: string;
   phone?: string;
   location?: string;
+  description?: string;
   bio?: string;
   profileImage?: string;
   coverImage?: string;
@@ -77,14 +78,19 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
     
-    console.log('API Request - action:', action, 'URL:', request.url);
+    console.log('=== API REQUEST START ===');
+    console.log('Action:', action);
+    console.log('Full URL:', request.url);
+    console.log('Search Params:', Object.fromEntries(searchParams.entries()));
     
-    // Handle CV viewing/downloading
+    // EXPLICIT: Handle CV requests ONLY when action=cv
     if (action === 'cv') {
+      console.log('Handling CV request');
       return handleCVRequest(request);
     }
     
-    // IMPORTANT: Default case - MUST return JSON profile
+    // DEFAULT: Always return JSON profile for all other cases
+    console.log('Handling profile JSON request');
     return await handleProfileRequest();
     
   } catch (error) {
@@ -95,13 +101,18 @@ export async function GET(request: NextRequest) {
         error: 'Failed to fetch profile',
         message: error instanceof Error ? error.message : 'Unknown error'
       },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
     );
   }
 }
 
 // Handle CV request - returns PDF
-async function handleCVRequest(request: NextRequest) {
+async function handleCVRequest(request: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
     const download = searchParams.get('download') === 'true';
@@ -117,22 +128,37 @@ async function handleCVRequest(request: NextRequest) {
     if (!profile || !profile.cvUrl) {
       return NextResponse.json(
         { error: 'CV not found' },
-        { status: 404 }
+        { 
+          status: 404,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
       );
     }
+
+    console.log('Fetching CV from:', profile.cvUrl);
 
     // Fetch the PDF from Cloudinary
     const response = await fetch(profile.cvUrl);
     
     if (!response.ok) {
+      console.error('Failed to fetch CV from Cloudinary:', response.status);
       return NextResponse.json(
-        { error: 'Failed to fetch CV' },
-        { status: 500 }
+        { error: 'Failed to fetch CV from storage' },
+        { 
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
       );
     }
 
     // Get the PDF buffer
     const pdfBuffer = await response.arrayBuffer();
+
+    console.log('Returning PDF, size:', pdfBuffer.byteLength, 'bytes');
 
     // Return the PDF with proper headers
     return new NextResponse(pdfBuffer, {
@@ -142,7 +168,7 @@ async function handleCVRequest(request: NextRequest) {
         'Content-Disposition': download 
           ? 'attachment; filename="CV_Resume.pdf"' 
           : 'inline; filename="CV_Resume.pdf"',
-        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Cache-Control': 'public, max-age=3600',
         'X-Content-Type-Options': 'nosniff',
       },
     });
@@ -150,16 +176,23 @@ async function handleCVRequest(request: NextRequest) {
     console.error('CV proxy error:', error);
     return NextResponse.json(
       { error: 'Failed to load CV' },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
     );
   }
 }
 
 // Handle profile request - returns JSON
-async function handleProfileRequest() {
+async function handleProfileRequest(): Promise<NextResponse> {
   try {
     const { db } = await connectToDatabase();
     const PROFILE_COLLECTION = 'profiles';
+    
+    console.log('Fetching profile from database...');
     
     // Get only published profile
     const profile = await db.collection(PROFILE_COLLECTION).findOne({ 
@@ -167,40 +200,107 @@ async function handleProfileRequest() {
     }) as MongoDBProfile | null;
     
     if (!profile) {
+      console.log('No published profile found');
       return NextResponse.json(
         { 
           success: false,
           error: 'Profile not found or not published',
           profile: null 
         },
-        { status: 404 }
+        { 
+          status: 404,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
       );
     }
     
-    // Remove MongoDB _id and convert to string
+    // Remove MongoDB _id and convert dates to strings
     const profileData = {
-      ...profile,
-      _id: profile._id ? profile._id.toString() : null,
-      createdAt: profile.createdAt ? profile.createdAt.toISOString() : null,
-      updatedAt: profile.updatedAt ? profile.updatedAt.toISOString() : null
+      id: profile._id ? profile._id.toString() : 'unknown',
+      fullName: profile.fullName || '',
+      email: profile.email || '',
+      phone: profile.phone || '',
+      title: profile.title || '',
+      description: profile.description || '',
+      bio: profile.bio || '',
+      profileImage: profile.profileImage || '',
+      coverImage: profile.coverImage || '',
+      cvUrl: profile.cvUrl || '',
+      socialLinks: profile.socialLinks || {
+        github: '',
+        linkedin: '',
+        twitter: '',
+        facebook: '',
+        instagram: '',
+        website: '',
+        youtube: '',
+        dribbble: '',
+        behance: '',
+        medium: '',
+        stackoverflow: ''
+      },
+      experience: profile.experience || {
+        years: 0,
+        title: '',
+        description: '',
+        projectsCompleted: 0,
+        clientsCount: 0,
+        companies: []
+      },
+      technologies: profile.technologies || [],
+      skills: profile.skills || [],
+      education: profile.education || [],
+      certifications: profile.certifications || [],
+      stats: profile.stats || {
+        postsCount: 0,
+        projectsCount: 0,
+        servicesCount: 0,
+        viewsCount: 0,
+        githubRepos: 0,
+        githubStars: 0
+      },
+      location: profile.location || '',
+      availability: profile.availability ?? true,
+      hourlyRate: profile.hourlyRate,
+      contactEmail: profile.contactEmail || profile.email || '',
+      isPublished: profile.isPublished ?? false,
+      createdAt: profile.createdAt ? profile.createdAt.toISOString() : new Date().toISOString(),
+      updatedAt: profile.updatedAt ? profile.updatedAt.toISOString() : new Date().toISOString()
     };
     
-    // Safe logging - check if fullName exists
-    console.log('Returning profile data for:', profileData.fullName || 'Unnamed Profile');
+    console.log('Returning profile JSON for:', profileData.fullName);
+    console.log('Profile data size:', JSON.stringify(profileData).length, 'characters');
     
-    return NextResponse.json({ 
-      success: true,
-      profile: profileData
-    });
+    return NextResponse.json(
+      { 
+        success: true,
+        profile: profileData
+      },
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        }
+      }
+    );
   } catch (error) {
     console.error('Profile fetch error:', error);
     return NextResponse.json(
       { 
         success: false,
         error: 'Failed to fetch profile',
+        message: error instanceof Error ? error.message : 'Unknown error',
         profile: null 
       },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
     );
   }
 }
