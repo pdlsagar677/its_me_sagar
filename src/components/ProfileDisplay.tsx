@@ -119,32 +119,58 @@ const ProfilePage = () => {
     fetchProfile();
   }, []);
 
-  const fetchProfile = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const response = await fetch('/api/profile');
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch profile');
+ const fetchProfile = async () => {
+  try {
+    setIsLoading(true);
+    setError(null);
+    
+    console.log('Fetching profile...');
+    
+    // Add cache: 'no-cache' to prevent stale data
+    const response = await fetch('/api/profile', {
+      cache: 'no-cache',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
       }
-      
-      const data = await response.json();
-      
-      if (data.success && data.profile) {
-        setProfile(data.profile);
-      } else {
-        throw new Error('Profile not found');
-      }
-    } catch (error) {
-      console.error('Fetch profile error:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch profile');
-    } finally {
-      setIsLoading(false);
+    });
+    
+    console.log('Response status:', response.status);
+    
+    // Check content type first
+    const contentType = response.headers.get('content-type');
+    console.log('Content-Type:', contentType);
+    
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('Non-JSON response received:', text.substring(0, 200));
+      throw new Error('API returned non-JSON response. Received: ' + text.substring(0, 100));
     }
-  };
+    
+    const data = await response.json();
+    console.log('Profile data received:', data);
+    
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP ${response.status}: ${data.message || 'Failed to fetch profile'}`);
+    }
+    
+    if (data.success && data.profile) {
+      setProfile(data.profile);
+    } else {
+      throw new Error(data.error || 'Profile not found');
+    }
+  } catch (error) {
+    console.error('Fetch profile error:', error);
+    setError(error instanceof Error ? error.message : 'Failed to fetch profile');
+    
+    // If error is about PDF, show specific message
+    if (error instanceof Error && error.message.includes('PDF')) {
+      setError('API configuration error: Received PDF instead of profile data');
+    }
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   if (isLoading) {
     return (
