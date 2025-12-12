@@ -1,6 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb/connection';
 
+interface MongoDBProfile {
+  _id?: any;
+  fullName?: string;
+  title?: string;
+  email?: string;
+  phone?: string;
+  location?: string;
+  bio?: string;
+  profileImage?: string;
+  coverImage?: string;
+  cvUrl?: string;
+  socialLinks?: {
+    github?: string;
+    linkedin?: string;
+    twitter?: string;
+    facebook?: string;
+    instagram?: string;
+    website?: string;
+    youtube?: string;
+    dribbble?: string;
+    behance?: string;
+    medium?: string;
+    stackoverflow?: string;
+  };
+  experience?: {
+    years?: number;
+    title?: string;
+    description?: string;
+    projectsCompleted?: number;
+    clientsCount?: number;
+    companies?: {
+      name?: string;
+      position?: string;
+      duration?: string;
+      description?: string;
+    }[];
+  };
+  technologies?: string[];
+  skills?: {
+    category?: string;
+    items?: string[];
+    level?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  }[];
+  education?: {
+    degree?: string;
+    institution?: string;
+    year?: string;
+    description?: string;
+  }[];
+  certifications?: {
+    name?: string;
+    issuer?: string;
+    year?: string;
+    url?: string;
+  }[];
+  stats?: {
+    postsCount?: number;
+    projectsCount?: number;
+    servicesCount?: number;
+    viewsCount?: number;
+    githubRepos?: number;
+    githubStars?: number;
+  };
+  availability?: boolean;
+  hourlyRate?: number;
+  contactEmail?: string;
+  isPublished?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -41,7 +112,7 @@ async function handleCVRequest(request: NextRequest) {
     // Get published profile with CV
     const profile = await db.collection(PROFILE_COLLECTION).findOne({ 
       isPublished: true 
-    });
+    }) as MongoDBProfile | null;
     
     if (!profile || !profile.cvUrl) {
       return NextResponse.json(
@@ -93,7 +164,7 @@ async function handleProfileRequest() {
     // Get only published profile
     const profile = await db.collection(PROFILE_COLLECTION).findOne({ 
       isPublished: true 
-    });
+    }) as MongoDBProfile | null;
     
     if (!profile) {
       return NextResponse.json(
@@ -114,7 +185,8 @@ async function handleProfileRequest() {
       updatedAt: profile.updatedAt ? profile.updatedAt.toISOString() : null
     };
     
-    console.log('Returning profile data for:', profileData.fullName);
+    // Safe logging - check if fullName exists
+    console.log('Returning profile data for:', profileData.fullName || 'Unnamed Profile');
     
     return NextResponse.json({ 
       success: true,
