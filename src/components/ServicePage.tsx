@@ -274,41 +274,9 @@ const ServicesPage = () => {
           ))}
         </div>
 
-        {/* Stats Section */}
-        <div className="mt-16 bg-gradient-to-r from-gray-900 to-black rounded-2xl p-8 text-white">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div className="text-center">
-              <div className="text-3xl font-bold mb-2">16+</div>
-              <div className="text-gray-300">Services</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold mb-2">50+</div>
-              <div className="text-gray-300">Technologies</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold mb-2">24/7</div>
-              <div className="text-gray-300">Support</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold mb-2">100%</div>
-              <div className="text-gray-300">Satisfaction</div>
-            </div>
-          </div>
-        </div>
+      
 
-        {/* CTA Section */}
-        <div className="mt-12 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Need a Custom Solution?
-          </h2>
-          <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
-            We specialize in building tailored solutions for unique business requirements. 
-            Let's discuss your project!
-          </p>
-          <button className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-lg hover:opacity-90 transition-opacity shadow-lg hover:shadow-xl">
-            Get In Touch
-          </button>
-        </div>
+        
       </div>
 
       {/* Footer Note */}
