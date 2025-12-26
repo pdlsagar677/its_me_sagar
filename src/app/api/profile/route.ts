@@ -73,23 +73,23 @@ interface MongoDBProfile {
   updatedAt?: Date;
 }
 
+// GET: Handle both profile JSON and CV PDF requests
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
     
-    console.log('=== API REQUEST START ===');
-    console.log('Action:', action);
-    console.log('Full URL:', request.url);
-    console.log('Search Params:', Object.fromEntries(searchParams.entries()));
+    console.log('=== PROFILE API REQUEST ===');
+    console.log('Action:', action || 'get-profile');
+    console.log('URL:', request.url);
     
-    // EXPLICIT: Handle CV requests ONLY when action=cv
+    // If action is explicitly 'cv', handle CV request
     if (action === 'cv') {
       console.log('Handling CV request');
-      return handleCVRequest(request);
+      return await handleCVRequest(request);
     }
     
-    // DEFAULT: Always return JSON profile for all other cases
+    // Otherwise, handle regular profile JSON request
     console.log('Handling profile JSON request');
     return await handleProfileRequest();
     
@@ -127,7 +127,10 @@ async function handleCVRequest(request: NextRequest): Promise<NextResponse> {
     
     if (!profile || !profile.cvUrl) {
       return NextResponse.json(
-        { error: 'CV not found' },
+        { 
+          success: false,
+          error: 'CV not found or profile not published'
+        },
         { 
           status: 404,
           headers: {
@@ -140,12 +143,15 @@ async function handleCVRequest(request: NextRequest): Promise<NextResponse> {
     console.log('Fetching CV from:', profile.cvUrl);
 
     // Fetch the PDF from Cloudinary
-    const response = await fetch(profile.cvUrl);
+    const cvResponse = await fetch(profile.cvUrl);
     
-    if (!response.ok) {
-      console.error('Failed to fetch CV from Cloudinary:', response.status);
+    if (!cvResponse.ok) {
+      console.error('Failed to fetch CV from Cloudinary:', cvResponse.status);
       return NextResponse.json(
-        { error: 'Failed to fetch CV from storage' },
+        { 
+          success: false,
+          error: 'Failed to fetch CV from storage' 
+        },
         { 
           status: 500,
           headers: {
@@ -156,7 +162,7 @@ async function handleCVRequest(request: NextRequest): Promise<NextResponse> {
     }
 
     // Get the PDF buffer
-    const pdfBuffer = await response.arrayBuffer();
+    const pdfBuffer = await cvResponse.arrayBuffer();
 
     console.log('Returning PDF, size:', pdfBuffer.byteLength, 'bytes');
 
@@ -175,7 +181,11 @@ async function handleCVRequest(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     console.error('CV proxy error:', error);
     return NextResponse.json(
-      { error: 'Failed to load CV' },
+      { 
+        success: false,
+        error: 'Failed to load CV',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
       { 
         status: 500,
         headers: {
@@ -216,7 +226,7 @@ async function handleProfileRequest(): Promise<NextResponse> {
       );
     }
     
-    // Remove MongoDB _id and convert dates to strings
+    // Transform MongoDB document to client-friendly format
     const profileData = {
       id: profile._id ? profile._id.toString() : 'unknown',
       fullName: profile.fullName || '',
@@ -271,7 +281,6 @@ async function handleProfileRequest(): Promise<NextResponse> {
     };
     
     console.log('Returning profile JSON for:', profileData.fullName);
-    console.log('Profile data size:', JSON.stringify(profileData).length, 'characters');
     
     return NextResponse.json(
       { 
@@ -302,5 +311,425 @@ async function handleProfileRequest(): Promise<NextResponse> {
         }
       }
     );
+  }
+}
+
+// POST: Handle file uploads and admin operations
+export async function POST(request: NextRequest) {
+  try {
+    // Check authentication
+    const isAuthenticated = await checkAuth(request);
+    if (!isAuthenticated) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Unauthorized' 
+        },
+        { status: 401 }
+      );
+    }
+
+    const formData = await request.formData();
+    const action = formData.get('action') as string;
+    
+    if (!action) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Action parameter required' 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Import profile service for admin operations
+    const { profileService } = await import('@/lib/mongodb/profileService');
+    let result;
+    
+    switch (action) {
+      case 'upload-profile-image': {
+        const image = formData.get('image') as File;
+        if (!image) {
+          return NextResponse.json(
+            { 
+              success: false,
+              error: 'Image file required' 
+            },
+            { status: 400 }
+          );
+        }
+
+        const buffer = Buffer.from(await image.arrayBuffer());
+        result = await profileService.uploadProfileImage(buffer, image.name);
+        break;
+      }
+
+      case 'upload-cover-image': {
+        const image = formData.get('image') as File;
+        if (!image) {
+          return NextResponse.json(
+            { 
+              success: false,
+              error: 'Image file required' 
+            },
+            { status: 400 }
+          );
+        }
+
+        const buffer = Buffer.from(await image.arrayBuffer());
+        result = await profileService.uploadCoverImage(buffer, image.name);
+        break;
+      }
+
+      case 'upload-cv': {
+        const cvFile = formData.get('cv') as File;
+        if (!cvFile) {
+          return NextResponse.json(
+            { 
+              success: false,
+              error: 'CV file required' 
+            },
+            { status: 400 }
+          );
+        }
+
+        const buffer = Buffer.from(await cvFile.arrayBuffer());
+        result = await profileService.uploadCV(buffer, cvFile.name);
+        break;
+      }
+
+      default:
+        return NextResponse.json(
+          { 
+            success: false,
+            error: 'Invalid action' 
+          },
+          { status: 400 }
+        );
+    }
+    
+    if (!result.success) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: result.error 
+        },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json({ 
+      success: true,
+      profile: result.profile,
+      message: `${action.replace('upload-', '').replace('-image', ' image').toUpperCase()} uploaded successfully` 
+    });
+  } catch (error) {
+    console.error('POST profile error:', error);
+    return NextResponse.json(
+      { 
+        success: false,
+        error: 'Failed to process request',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT: Update profile information
+export async function PUT(request: NextRequest) {
+  try {
+    // Check authentication
+    const isAuthenticated = await checkAuth(request);
+    if (!isAuthenticated) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Unauthorized' 
+        },
+        { status: 401 }
+      );
+    }
+
+    const contentType = request.headers.get('content-type') || '';
+    
+    if (contentType.includes('application/json')) {
+      const data = await request.json();
+      const { action, ...updates } = data;
+      
+      if (!action) {
+        return NextResponse.json(
+          { 
+            success: false,
+            error: 'Action parameter required' 
+          },
+          { status: 400 }
+        );
+      }
+
+      // Import profile service
+      const { profileService } = await import('@/lib/mongodb/profileService');
+      let result;
+      
+      switch (action) {
+        case 'toggle-publish': {
+          const isPublished = updates.isPublished === true || updates.isPublished === 'true';
+          result = await profileService.togglePublishStatus(isPublished);
+          break;
+        }
+        
+        case 'update-basic': {
+          result = await profileService.updateProfile(updates);
+          break;
+        }
+        
+        case 'update-social': {
+          const socialLinks = updates.socialLinks;
+          if (!socialLinks) {
+            return NextResponse.json(
+              { 
+                success: false,
+                error: 'Social links data required' 
+              },
+              { status: 400 }
+            );
+          }
+          result = await profileService.updateSocialLinks(socialLinks);
+          break;
+        }
+        
+        case 'update-skills': {
+          const skills = updates.skills;
+          if (!skills) {
+            return NextResponse.json(
+              { 
+                success: false,
+                error: 'Skills data required' 
+              },
+              { status: 400 }
+            );
+          }
+          result = await profileService.updateSkills(skills);
+          break;
+        }
+        
+        case 'update-technologies': {
+          const technologies = updates.technologies;
+          if (!technologies) {
+            return NextResponse.json(
+              { 
+                success: false,
+                error: 'Technologies data required' 
+              },
+              { status: 400 }
+            );
+          }
+          result = await profileService.updateTechnologies(technologies);
+          break;
+        }
+        
+        case 'update-experience': {
+          const experience = updates.experience;
+          if (!experience) {
+            return NextResponse.json(
+              { 
+                success: false,
+                error: 'Experience data required' 
+              },
+              { status: 400 }
+            );
+          }
+          result = await profileService.updateExperience(experience);
+          break;
+        }
+        
+        case 'update-education': {
+          const education = updates.education;
+          if (!education) {
+            return NextResponse.json(
+              { 
+                success: false,
+                error: 'Education data required' 
+              },
+              { status: 400 }
+            );
+          }
+          result = await profileService.updateEducation(education);
+          break;
+        }
+        
+        case 'update-certifications': {
+          const certifications = updates.certifications;
+          if (!certifications) {
+            return NextResponse.json(
+              { 
+                success: false,
+                error: 'Certifications data required' 
+              },
+              { status: 400 }
+            );
+          }
+          result = await profileService.updateCertifications(certifications);
+          break;
+        }
+        
+        default: {
+          return NextResponse.json(
+            { 
+              success: false,
+              error: 'Invalid action' 
+            },
+            { status: 400 }
+          );
+        }
+      }
+      
+      if (!result.success) {
+        return NextResponse.json(
+          { 
+            success: false,
+            error: result.error 
+          },
+          { status: 500 }
+        );
+      }
+      
+      return NextResponse.json({ 
+        success: true,
+        profile: result.profile,
+        message: 'Profile updated successfully' 
+      });
+      
+    } else {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Unsupported content type. Use application/json' 
+        },
+        { status: 400 }
+      );
+    }
+  } catch (error) {
+    console.error('PUT profile error:', error);
+    return NextResponse.json(
+      { 
+        success: false,
+        error: 'Failed to update profile',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE: Handle deletion of profile images or CV
+export async function DELETE(request: NextRequest) {
+  try {
+    // Check authentication
+    const isAuthenticated = await checkAuth(request);
+    if (!isAuthenticated) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Unauthorized' 
+        },
+        { status: 401 }
+      );
+    }
+
+    const searchParams = new URL(request.url).searchParams;
+    const action = searchParams.get('action');
+    
+    if (!action) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Action parameter required' 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Import profile service
+    const { profileService } = await import('@/lib/mongodb/profileService');
+    let result;
+    
+    switch (action) {
+      case 'delete-profile-image':
+        result = await profileService.deleteProfileImage();
+        break;
+        
+      case 'delete-cover-image':
+        result = await profileService.deleteCoverImage();
+        break;
+        
+      case 'delete-cv':
+        result = await profileService.deleteCV();
+        break;
+        
+      default:
+        return NextResponse.json(
+          { 
+            success: false,
+            error: 'Invalid action' 
+          },
+          { status: 400 }
+        );
+    }
+    
+    if (!result.success) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: result.error 
+        },
+        { status: 500 }
+      );
+    }
+    
+    // Fetch updated profile after deletion
+    const updatedProfile = await profileService.getProfile();
+    
+    return NextResponse.json({ 
+      success: true,
+      profile: updatedProfile,
+      message: `${action.replace('delete-', '').replace('-image', ' image').toUpperCase()} deleted successfully` 
+    });
+  } catch (error) {
+    console.error('DELETE profile error:', error);
+    return NextResponse.json(
+      { 
+        success: false,
+        error: 'Failed to delete item',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// Helper function to check authentication (replace with your actual auth logic)
+async function checkAuth(request: NextRequest): Promise<boolean> {
+  try {
+    // Get session token from cookies
+    const cookies = request.headers.get('cookie') || '';
+    
+    // Check for session tokens (customize based on your auth system)
+    const hasValidSession = 
+      cookies.includes('session-token') || 
+      cookies.includes('auth-token') ||
+      cookies.includes('next-auth.session-token') ||
+      cookies.includes('__Secure-next-auth.session-token');
+    
+    // For development, you might want to allow requests
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Development mode: Auth bypassed');
+      return true;
+    }
+    
+    return hasValidSession;
+  } catch (error) {
+    console.error('Auth check error:', error);
+    return false;
   }
 }
