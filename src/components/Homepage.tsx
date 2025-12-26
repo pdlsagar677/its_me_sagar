@@ -64,27 +64,50 @@ const HomePage = () => {
     try {
       setIsLoading(true);
       
-      // Fetch profile
-      const profileRes = await fetch('/api/profile');
-      if (profileRes.ok) {
+      console.log('Fetching homepage data...');
+      
+      // Fetch profile - Use the correct endpoint
+      const profileRes = await fetch('/api/profile', {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        cache: 'no-store'
+      });
+      
+      console.log('Profile response status:', profileRes.status);
+      console.log('Profile content-type:', profileRes.headers.get('content-type'));
+      
+      // FIRST check if it's a PDF
+      const contentType = profileRes.headers.get('content-type');
+      if (contentType?.includes('application/pdf')) {
+        console.error('Received PDF instead of JSON');
+        // Try fetching again with specific query to ensure JSON
+        const retryRes = await fetch('/api/profile?ensure=json', {
+          headers: { 'Accept': 'application/json' }
+        });
+        const profileData = await retryRes.json();
+        if (profileData.success) {
+          setProfile(profileData.profile);
+        }
+      } else {
+        // It's JSON, parse normally
         const profileData = await profileRes.json();
         if (profileData.success) {
           setProfile(profileData.profile);
         }
       }
       
-      // Fetch projects - Get only 3
+      // Fetch projects
       const projectsRes = await fetch('/api/projects?limit=3');
       if (projectsRes.ok) {
         const projectsData = await projectsRes.json();
         if (projectsData.success) {
-          // Take only first 3 projects
-          const limitedProjects = projectsData.projects.slice(0, 3);
-          setProjects(limitedProjects);
+          setProjects(projectsData.projects.slice(0, 3));
         }
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching homepage data:', error);
     } finally {
       setIsLoading(false);
     }
