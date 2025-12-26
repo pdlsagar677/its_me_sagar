@@ -82,14 +82,20 @@ export async function GET(request: NextRequest) {
     console.log('=== PROFILE API REQUEST ===');
     console.log('Action:', action || 'get-profile');
     console.log('URL:', request.url);
+    console.log('Environment:', process.env.NODE_ENV);
     
-    // If action is explicitly 'cv', handle CV request
-    if (action === 'cv') {
+    // IMPORTANT: Add additional check - ONLY return PDF when explicitly asking for CV
+    // Also check if it's a POST/other method that might be getting cached
+    const method = request.method;
+    console.log('HTTP Method:', method);
+    
+    // If action is explicitly 'cv' AND method is GET, handle CV request
+    if (action === 'cv' && method === 'GET') {
       console.log('Handling CV request');
       return await handleCVRequest(request);
     }
     
-    // Otherwise, handle regular profile JSON request
+    // ALWAYS return JSON for regular profile requests
     console.log('Handling profile JSON request');
     return await handleProfileRequest();
     
@@ -105,6 +111,7 @@ export async function GET(request: NextRequest) {
         status: 500,
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
         }
       }
     );
@@ -135,6 +142,7 @@ async function handleCVRequest(request: NextRequest): Promise<NextResponse> {
           status: 404,
           headers: {
             'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
           }
         }
       );
@@ -156,6 +164,7 @@ async function handleCVRequest(request: NextRequest): Promise<NextResponse> {
           status: 500,
           headers: {
             'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
           }
         }
       );
@@ -166,7 +175,7 @@ async function handleCVRequest(request: NextRequest): Promise<NextResponse> {
 
     console.log('Returning PDF, size:', pdfBuffer.byteLength, 'bytes');
 
-    // Return the PDF with proper headers
+    // Return the PDF with proper headers - IMPORTANT: no-cache for PDF too
     return new NextResponse(pdfBuffer, {
       status: 200,
       headers: {
@@ -174,7 +183,9 @@ async function handleCVRequest(request: NextRequest): Promise<NextResponse> {
         'Content-Disposition': download 
           ? 'attachment; filename="CV_Resume.pdf"' 
           : 'inline; filename="CV_Resume.pdf"',
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': 'no-cache, no-store, must-revalidate', // Changed from public
+        'Pragma': 'no-cache',
+        'Expires': '0',
         'X-Content-Type-Options': 'nosniff',
       },
     });
@@ -190,6 +201,7 @@ async function handleCVRequest(request: NextRequest): Promise<NextResponse> {
         status: 500,
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
         }
       }
     );
@@ -221,6 +233,7 @@ async function handleProfileRequest(): Promise<NextResponse> {
           status: 404,
           headers: {
             'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
           }
         }
       );
@@ -292,6 +305,8 @@ async function handleProfileRequest(): Promise<NextResponse> {
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
         }
       }
     );
@@ -308,6 +323,7 @@ async function handleProfileRequest(): Promise<NextResponse> {
         status: 500,
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
         }
       }
     );

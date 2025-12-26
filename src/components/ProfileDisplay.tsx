@@ -118,7 +118,6 @@ const ProfilePage = () => {
   useEffect(() => {
     fetchProfile();
   }, []);
-
 const fetchProfile = async () => {
   try {
     setIsLoading(true);
@@ -126,7 +125,9 @@ const fetchProfile = async () => {
     
     console.log('Fetching profile...');
     
-    const response = await fetch('/api/profile', {
+    // Add timestamp to prevent caching
+    const timestamp = Date.now();
+    const response = await fetch(`/api/profile?t=${timestamp}`, {
       cache: 'no-store',
       headers: {
         'Accept': 'application/json',
@@ -138,21 +139,38 @@ const fetchProfile = async () => {
     // Check content type
     const contentType = response.headers.get('content-type');
     console.log('Content-Type:', contentType);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
     
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await response.text();
-      console.error('Non-JSON response:', text.substring(0, 200));
+    // Read response as text first
+    const text = await response.text();
+    console.log('Response text (first 200 chars):', text.substring(0, 200));
+    
+    // Check if it's a PDF
+    if (text.startsWith('%PDF') || text.includes('PDF')) {
+      console.error('Received PDF instead of JSON');
       
-      // Check if it's a PDF
-      if (text.startsWith('%PDF')) {
-        throw new Error('Server returned PDF instead of profile data. Please check API configuration.');
+      // Try one more time with a different query
+      const retryResponse = await fetch(`/api/profile?format=json&t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' }
+      });
+      
+      const retryText = await retryResponse.text();
+      if (retryText.startsWith('%PDF')) {
+        throw new Error('API consistently returns PDF. Please check server configuration.');
       }
       
-      throw new Error(`Expected JSON but received: ${contentType}`);
+      const data = JSON.parse(retryText);
+      if (data.success && data.profile) {
+        setProfile(data.profile);
+      } else {
+        throw new Error(data.error || 'Invalid profile data after retry');
+      }
+      return;
     }
     
-    const data = await response.json();
-    console.log('Profile data received');
+    // Parse as JSON
+    const data = JSON.parse(text);
     
     if (!response.ok) {
       throw new Error(data.error || `HTTP ${response.status}`);
@@ -322,16 +340,16 @@ const fetchProfile = async () => {
             {profile.cvUrl && (
               <>
                 <a
-                  href="/api/profile?action=cv"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={`/api/profile?action=cv&t=${Date.now()}`}
+  target="_blank"
+  rel="noopener noreferrer"
                   className="px-6 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-white rounded-lg flex items-center transition-all duration-200 shadow-sm hover:shadow"
                 >
                   <FileText className="w-5 h-5 mr-2" />
                   View CV
                 </a>
                 <a
-                  href="/api/profile?action=cv&download=true"
+  href={`/api/profile?action=cv&download=true&t=${Date.now()}`}
                   className="px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-white rounded-lg flex items-center transition-all duration-200 shadow-sm hover:shadow"
                 >
                   <Download className="w-5 h-5 mr-2" />
