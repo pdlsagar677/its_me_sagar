@@ -118,38 +118,23 @@ const ProfilePage = () => {
   useEffect(() => {
     fetchProfile();
   }, []);
+
 const fetchProfile = async () => {
   try {
     setIsLoading(true);
     setError(null);
     
-    console.log('Fetching profile...');
-    
-    // Add timestamp to prevent caching
     const timestamp = Date.now();
     const response = await fetch(`/api/profile?t=${timestamp}`, {
       cache: 'no-store',
-      headers: {
-        'Accept': 'application/json',
-      }
+      headers: { 'Accept': 'application/json' }
     });
     
-    console.log('Response status:', response.status);
-    
-    // Check content type
-    const contentType = response.headers.get('content-type');
-    console.log('Content-Type:', contentType);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-    
-    // Read response as text first
     const text = await response.text();
-    console.log('Response text (first 200 chars):', text.substring(0, 200));
     
     // Check if it's a PDF
     if (text.startsWith('%PDF') || text.includes('PDF')) {
-      console.error('Received PDF instead of JSON');
-      
-      // Try one more time with a different query
+      // Retry once with different query
       const retryResponse = await fetch(`/api/profile?format=json&t=${Date.now()}`, {
         cache: 'no-store',
         headers: { 'Accept': 'application/json' }
@@ -157,23 +142,22 @@ const fetchProfile = async () => {
       
       const retryText = await retryResponse.text();
       if (retryText.startsWith('%PDF')) {
-        throw new Error('API consistently returns PDF. Please check server configuration.');
+        throw new Error('API configuration issue - contact support');
       }
       
       const data = JSON.parse(retryText);
       if (data.success && data.profile) {
         setProfile(data.profile);
       } else {
-        throw new Error(data.error || 'Invalid profile data after retry');
+        throw new Error(data.error || 'Invalid profile data');
       }
       return;
     }
     
-    // Parse as JSON
     const data = JSON.parse(text);
     
     if (!response.ok) {
-      throw new Error(data.error || `HTTP ${response.status}`);
+      throw new Error(data.error || `Failed to fetch profile`);
     }
     
     if (data.success && data.profile) {
@@ -182,13 +166,11 @@ const fetchProfile = async () => {
       throw new Error(data.error || 'Invalid profile data');
     }
   } catch (error) {
-    console.error('Fetch profile error:', error);
     setError(error instanceof Error ? error.message : 'Failed to fetch profile');
   } finally {
     setIsLoading(false);
   }
 };
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">

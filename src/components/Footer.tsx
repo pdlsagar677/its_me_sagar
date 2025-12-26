@@ -36,7 +36,6 @@ const Footer = () => {
         setIsLoading(true);
         setFetchError(null);
         
-        console.log("Footer: Fetching profile...");
         
         const response = await fetch("/api/profile", {
           headers: {
@@ -46,9 +45,7 @@ const Footer = () => {
           cache: 'no-store' // Prevent caching issues
         });
         
-        console.log("Footer: Response status:", response.status);
-        console.log("Footer: Content-Type:", response.headers.get('content-type'));
-        
+       
         // First, check if it's JSON
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
@@ -126,12 +123,7 @@ const Footer = () => {
       label: "LinkedIn",
       color: "hover:text-blue-400 hover:border-blue-500/50",
     },
-    {
-      icon: Twitter,
-      href: profile?.socialLinks?.twitter || "https://twitter.com",
-      label: "Twitter",
-      color: "hover:text-blue-300 hover:border-blue-400/50",
-    },
+   
     {
       icon: Globe,
       href: profile?.socialLinks?.website || "https://example.com",

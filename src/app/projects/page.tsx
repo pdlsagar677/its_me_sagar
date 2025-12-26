@@ -160,10 +160,14 @@ const ProjectsPage = () => {
   };
 
   // Get project image
-  const getProjectImage = (project: Project) => {
-    return project.coverImage || 
-           (project.screenshots && project.screenshots.length > 0 ? project.screenshots[0] : '/api/placeholder/400/250');
-  };
+ // Get project image
+const getProjectImage = (project: Project) => {
+  if (project.coverImage) return project.coverImage;
+  if (project.screenshots && project.screenshots.length > 0) return project.screenshots[0];
+  
+  // Use a real placeholder instead of /api/placeholder
+  return `https://placehold.co/400x250/1f2937/ffffff?text=${encodeURIComponent(project.title || 'Project')}`;
+};
 
   // View project details
   const viewProjectDetails = (projectId: string) => {
