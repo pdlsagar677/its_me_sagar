@@ -125,9 +125,12 @@ const HomePage = () => {
   };
 
   // Get project image
-  const getProjectImage = (project: Project) => {
-    return project.coverImage || '/api/placeholder/400/250';
-  };
+const getProjectImage = (project: Project) => {
+  if (project.coverImage) return project.coverImage;
+  
+  // Use a real placeholder service
+  return `https://placehold.co/400x250/1f2937/ffffff?text=${encodeURIComponent(project.title || 'Project')}`;
+};
 
   // Get status color
   const getStatusColor = (status: string) => {
