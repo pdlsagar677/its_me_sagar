@@ -27,20 +27,79 @@ const Footer = () => {
   const currentYear = new Date().getFullYear();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Fetch profile data to get social links
+  // Fetch profile data to get social links - FIXED VERSION
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await fetch("/api/profile");
-        if (response.ok) {
+        setIsLoading(true);
+        setFetchError(null);
+        
+        console.log("Footer: Fetching profile...");
+        
+        const response = await fetch("/api/profile", {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          cache: 'no-store' // Prevent caching issues
+        });
+        
+        console.log("Footer: Response status:", response.status);
+        console.log("Footer: Content-Type:", response.headers.get('content-type'));
+        
+        // First, check if it's JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          // Read as text first to check if it's PDF
+          const text = await response.text();
+          console.log("Footer: Response (first 50 chars):", text.substring(0, 50));
+          
+          if (text.startsWith('%PDF') || text.includes('PDF')) {
+            console.error("Footer: Received PDF instead of JSON");
+            setFetchError('Profile API returned PDF instead of JSON');
+            
+            // Try alternative: Use a query parameter to force JSON
+            try {
+              const retryResponse = await fetch('/api/profile?format=json', {
+                headers: { 'Accept': 'application/json' }
+              });
+              const retryData = await retryResponse.json();
+              if (retryData.success && retryData.profile) {
+                setProfile(retryData.profile);
+                return;
+              }
+            } catch (retryError) {
+              console.error("Footer: Retry failed:", retryError);
+            }
+            return;
+          }
+          
+          // Try to parse anyway if it looks like JSON
+          try {
+            const data = JSON.parse(text);
+            if (data.success && data.profile) {
+              setProfile(data.profile);
+              return;
+            }
+          } catch (parseError) {
+            console.error("Footer: Failed to parse response:", parseError);
+            setFetchError('Invalid response format');
+            return;
+          }
+        } else {
+          // It's JSON, parse normally
           const data = await response.json();
           if (data.success && data.profile) {
             setProfile(data.profile);
+          } else {
+            setFetchError(data.error || 'Failed to fetch profile');
           }
         }
       } catch (error) {
-        console.error("Error fetching profile for footer:", error);
+        console.error("Footer: Error fetching profile:", error);
+        setFetchError('Network error - could not fetch profile');
       } finally {
         setIsLoading(false);
       }
@@ -57,25 +116,25 @@ const Footer = () => {
   const socialLinks = [
     {
       icon: Github,
-      href: profile?.socialLinks?.github || "#",
+      href: profile?.socialLinks?.github || "https://github.com",
       label: "GitHub",
       color: "hover:text-white hover:border-white/50",
     },
     {
       icon: Linkedin,
-      href: profile?.socialLinks?.linkedin || "#",
+      href: profile?.socialLinks?.linkedin || "https://linkedin.com",
       label: "LinkedIn",
       color: "hover:text-blue-400 hover:border-blue-500/50",
     },
     {
       icon: Twitter,
-      href: profile?.socialLinks?.twitter || "#",
+      href: profile?.socialLinks?.twitter || "https://twitter.com",
       label: "Twitter",
       color: "hover:text-blue-300 hover:border-blue-400/50",
     },
     {
       icon: Globe,
-      href: profile?.socialLinks?.website || "#",
+      href: profile?.socialLinks?.website || "https://example.com",
       label: "Website",
       color: "hover:text-emerald-400 hover:border-emerald-500/50",
     },
@@ -83,16 +142,15 @@ const Footer = () => {
       icon: Mail,
       href: profile?.socialLinks?.email
         ? `mailto:${profile.socialLinks.email}`
-        : "#",
+        : "mailto:hello@example.com",
       label: "Email",
       color: "hover:text-orange-400 hover:border-orange-500/50",
     },
-  ].filter((link) => link.href !== "#"); // Remove empty links
+  ].filter((link) => link.href !== "#" && !link.href.includes('example.com')); // Remove empty or example links
 
   const quickLinks = [
     { label: "Home", href: "/" },
     { label: "Blog", href: "/blog" },
-
     { label: "Projects", href: "/projects" },
     { label: "Profile", href: "/profile" },
   ];
@@ -142,30 +200,33 @@ const Footer = () => {
             </div>
 
             {/* Social Links - Only show if we have data */}
-            {!isLoading && socialLinks.length > 0 && (
-              <div className="flex items-center space-x-3">
-                {socialLinks.map((social) => (
-                  <a
-                    key={social.label}
-                    href={social.href}
-                    target={social.label !== "Email" ? "_blank" : "_self"}
-                    rel={social.label !== "Email" ? "noopener noreferrer" : ""}
-                    className={`w-9 h-9 rounded-xl bg-gray-800/50 flex items-center justify-center text-gray-400 border border-gray-700/50 transition-all duration-300 group ${social.color}`}
-                    aria-label={social.label}
-                    title={social.label}
-                  >
-                    <social.icon className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  </a>
-                ))}
-              </div>
-            )}
+            <div className="flex items-center space-x-3">
+              {socialLinks.map((social) => (
+                <a
+                  key={social.label}
+                  href={social.href}
+                  target={social.label !== "Email" ? "_blank" : "_self"}
+                  rel={social.label !== "Email" ? "noopener noreferrer" : ""}
+                  className={`w-9 h-9 rounded-xl bg-gray-800/50 flex items-center justify-center text-gray-400 border border-gray-700/50 transition-all duration-300 group ${social.color}`}
+                  aria-label={social.label}
+                  title={social.label}
+                >
+                  <social.icon className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                </a>
+              ))}
+            </div>
 
-            {/* Copyright */}
+            {/* Copyright & Error Message */}
             <div className="text-center md:text-right">
               <p className="text-gray-500 text-sm flex items-center justify-center md:justify-end">
                 <Copyright className="w-3 h-3 mr-1" />
                 {currentYear} Made with by Sagar
               </p>
+              {fetchError && (
+                <p className="text-xs text-yellow-500 mt-1">
+                  Note: Could not load social links
+                </p>
+              )}
             </div>
           </div>
         </div>
