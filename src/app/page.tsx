@@ -1,4 +1,6 @@
-import React from 'react';
+"use client";
+
+import React, { useEffect, useState } from 'react';
 import { 
   Mail,
   Phone,
@@ -13,10 +15,11 @@ import {
   ChevronRight,
   Star,
   Eye,
-  Briefcase
+  Briefcase,
+  Users
 } from 'lucide-react';
 import Image from 'next/image';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 // Define interfaces
 interface Project {
@@ -49,61 +52,85 @@ interface Profile {
   };
 }
 
-// This runs at build time (or at request time with revalidate)
-async function getHomeData() {
-  try {
-    console.log('Fetching homepage data at build time...');
-    
-    // Fetch profile
-    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/profile`, {
-      next: { revalidate: 60 } // Revalidate every 60 seconds (ISR)
-    });
-    
-    let profile: Profile | null = null;
-    if (profileRes.ok) {
-      const profileData = await profileRes.json();
-      if (profileData.success) {
-        profile = profileData.profile;
-      }
-    }
-    
-    // Fetch projects
-    const projectsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/projects?limit=3`, {
-      next: { revalidate: 60 } // Revalidate every 60 seconds (ISR)
-    });
-    
-    let projects: Project[] = [];
-    if (projectsRes.ok) {
-      const projectsData = await projectsRes.json();
-      if (projectsData.success) {
-        projects = projectsData.projects.slice(0, 3);
-      }
-    }
-    
-    return {
-      profile,
-      projects,
-      timestamp: new Date().toISOString()
-    };
-  } catch (error) {
-    console.error('Error fetching homepage data:', error);
-    return {
-      profile: null,
-      projects: [],
-      timestamp: new Date().toISOString()
-    };
-  }
-}
+const HomePage = () => {
+  const router = useRouter();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-export default async function HomePage() {
-  // This runs on the server at build time or request time
-  const { profile, projects, timestamp } = await getHomeData();
-  
-  // Get project image
-  const getProjectImage = (project: Project) => {
-    if (project.coverImage) return project.coverImage;
-    return `https://placehold.co/400x250/1f2937/ffffff?text=${encodeURIComponent(project.title || 'Project')}`;
+  // Fetch profile and projects data
+ useEffect(() => {
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      
+      console.log('Fetching homepage data...');
+      
+      // Fetch profile - Use the correct endpoint
+      const profileRes = await fetch('/api/profile', {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        cache: 'no-store'
+      });
+      
+      console.log('Profile response status:', profileRes.status);
+      console.log('Profile content-type:', profileRes.headers.get('content-type'));
+      
+      // FIRST check if it's a PDF
+      const contentType = profileRes.headers.get('content-type');
+      if (contentType?.includes('application/pdf')) {
+        console.error('Received PDF instead of JSON');
+        // Try fetching again with specific query to ensure JSON
+        const retryRes = await fetch('/api/profile?ensure=json', {
+          headers: { 'Accept': 'application/json' }
+        });
+        const profileData = await retryRes.json();
+        if (profileData.success) {
+          setProfile(profileData.profile);
+        }
+      } else {
+        // It's JSON, parse normally
+        const profileData = await profileRes.json();
+        if (profileData.success) {
+          setProfile(profileData.profile);
+        }
+      }
+      
+      // Fetch projects
+      const projectsRes = await fetch('/api/projects?limit=3');
+      if (projectsRes.ok) {
+        const projectsData = await projectsRes.json();
+        if (projectsData.success) {
+          setProjects(projectsData.projects.slice(0, 3));
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching homepage data:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  fetchData();
+}, []);
+  // Navigation functions
+  const viewProjectDetails = (projectId: string) => {
+    router.push(`/projects/${projectId}`);
+  };
+
+  const viewAllProjects = () => {
+    router.push('/projects');
+  };
+
+  // Get project image
+const getProjectImage = (project: Project) => {
+  if (project.coverImage) return project.coverImage;
+  
+  // Use a real placeholder service
+  return `https://placehold.co/400x250/1f2937/ffffff?text=${encodeURIComponent(project.title || 'Project')}`;
+};
 
   // Get status color
   const getStatusColor = (status: string) => {
@@ -115,6 +142,14 @@ export default async function HomePage() {
       default: return 'bg-gray-500/10 text-gray-400 border border-gray-500/20';
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-950">
@@ -188,101 +223,105 @@ export default async function HomePage() {
 
       {/* ========== PROJECTS SECTION ========== */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gray-900/50">
-        <div className="max-w-7xl mx-auto">
-          {/* Section Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-12">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">
-                My <span className="text-orange-400">Projects</span>
-              </h2>
-              <p className="text-gray-400">A showcase of my recent work and contributions</p>
+  <div className="max-w-7xl mx-auto">
+    {/* Section Header */}
+    <div className="flex flex-col md:flex-row md:items-center justify-between mb-12">
+      <div>
+        <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">
+          My <span className="text-orange-400">Projects</span>
+        </h2>
+        <p className="text-gray-400">A showcase of my recent work and contributions</p>
+      </div>
+      <button
+        onClick={viewAllProjects}
+        className="mt-4 md:mt-0 px-6 py-3 bg-gradient-to-r from-gray-800/50 to-gray-900/50 hover:from-orange-600/20 hover:to-amber-600/10 border border-gray-700/50 hover:border-orange-500/30 text-gray-300 hover:text-white rounded-xl transition-all flex items-center font-medium group"
+      >
+        <span>View All Projects</span>
+        <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+      </button>
+    </div>
+
+    {/* Projects Grid - FIXED for single project centering */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {projects.length > 0 ? (
+        projects.map((project) => (
+          <div 
+            key={project.id}
+            className={`group bg-gradient-to-br from-gray-800/50 to-gray-700/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 hover:border-orange-500/30 transition-all duration-300 overflow-hidden ${
+              projects.length === 1 
+                ? 'md:col-start-2 lg:col-start-2' // Center single project
+                : projects.length === 2 
+                  ? 'lg:col-span-1' // Normal for 2 projects
+                  : ''
+            }`}
+          >
+            {/* Project Image */}
+            <div className="relative h-48 w-full overflow-hidden">
+              <img
+                src={getProjectImage(project)}
+                alt={project.title}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-gray-900/60 via-transparent to-transparent"></div>
+              
+              {/* Status Badge */}
+              <span className={`absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status || 'completed')}`}>
+                {project.status?.charAt(0).toUpperCase() + project.status?.slice(1).replace('-', ' ') || 'Completed'}
+              </span>
+              
+              {project.isFeatured && (
+                <span className="absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-amber-500/20 to-orange-500/10 text-amber-300 border border-amber-500/20">
+                  <Star className="w-3 h-3 inline mr-1" />
+                  Featured
+                </span>
+              )}
             </div>
-            <Link
-              href="/projects"
-              className="mt-4 md:mt-0 px-6 py-3 bg-gradient-to-r from-gray-800/50 to-gray-900/50 hover:from-orange-600/20 hover:to-amber-600/10 border border-gray-700/50 hover:border-orange-500/30 text-gray-300 hover:text-white rounded-xl transition-all flex items-center font-medium group"
-            >
-              <span>View All Projects</span>
-              <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-            </Link>
-          </div>
 
-          {/* Projects Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.length > 0 ? (
-              projects.map((project: Project) => ( // Added type annotation here
-                <div 
-                  key={project.id}
-                  className="group bg-gradient-to-br from-gray-800/50 to-gray-700/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 hover:border-orange-500/30 transition-all duration-300 overflow-hidden"
-                >
-                  {/* Project Image */}
-                  <div className="relative h-48 w-full overflow-hidden">
-                    <img
-                      src={getProjectImage(project)}
-                      alt={project.title}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900/60 via-transparent to-transparent"></div>
-                    
-                    {/* Status Badge */}
-                    <span className={`absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status || 'completed')}`}>
-                      {project.status?.charAt(0).toUpperCase() + project.status?.slice(1).replace('-', ' ') || 'Completed'}
-                    </span>
-                    
-                    {project.isFeatured && (
-                      <span className="absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-amber-500/20 to-orange-500/10 text-amber-300 border border-amber-500/20">
-                        <Star className="w-3 h-3 inline mr-1" />
-                        Featured
-                      </span>
-                    )}
-                  </div>
+            {/* Project Content */}
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-white mb-2 group-hover:text-orange-300 transition-colors">
+                {project.title}
+              </h3>
+              <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+                {project.shortDescription || project.description}
+              </p>
 
-                  {/* Project Content */}
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-white mb-2 group-hover:text-orange-300 transition-colors">
-                      {project.title}
-                    </h3>
-                    <p className="text-gray-400 text-sm mb-4 line-clamp-2">
-                      {project.shortDescription || project.description}
-                    </p>
-
-                    {/* Technologies */}
-                    <div className="mb-6">
-                      <div className="flex flex-wrap gap-2">
-                        {project.technologies?.slice(0, 4).map((tech: string, index: number) => (
-                          <span 
-                            key={index}
-                            className="px-2 py-1 text-xs bg-gray-700/50 text-gray-300 border border-gray-600/50 rounded-lg"
-                          >
-                            {tech}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Action Button */}
-                    <Link 
-                      href={`/projects/${project.id}`}
-                      className="block w-full px-4 py-3 bg-gradient-to-r from-gray-800/50 to-gray-900/50 hover:from-orange-600/20 hover:to-amber-600/10 border border-gray-700/50 hover:border-orange-500/30 text-gray-300 hover:text-white rounded-xl transition-all text-center group/btn"
+              {/* Technologies */}
+              <div className="mb-6">
+                <div className="flex flex-wrap gap-2">
+                  {project.technologies?.slice(0, 4).map((tech, index) => (
+                    <span 
+                      key={index}
+                      className="px-2 py-1 text-xs bg-gray-700/50 text-gray-300 border border-gray-600/50 rounded-lg"
                     >
-                      <div className="flex items-center justify-center">
-                        <Eye className="w-4 h-4 mr-2" />
-                        View Details
-                        <ArrowRight className="w-4 h-4 ml-2 group-hover/btn:translate-x-1 transition-transform" />
-                      </div>
-                    </Link>
-                  </div>
+                      {tech}
+                    </span>
+                  ))}
                 </div>
-              ))
-            ) : (
-              <div className="col-span-3 text-center py-16 bg-gradient-to-br from-gray-800/50 to-gray-700/30 backdrop-blur-sm rounded-2xl border border-gray-700/50">
-                <FolderOpen className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-white mb-2">No Projects Yet</h3>
-                <p className="text-gray-400">Projects will appear here once added</p>
               </div>
-            )}
+
+              {/* Action Button */}
+              <button 
+                onClick={() => viewProjectDetails(project.id)}
+                className="w-full inline-flex items-center justify-center px-4 py-3 bg-gradient-to-r from-gray-800/50 to-gray-900/50 hover:from-orange-600/20 hover:to-amber-600/10 border border-gray-700/50 hover:border-orange-500/30 text-gray-300 hover:text-white rounded-xl transition-all group/btn"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                View Details
+                <ArrowRight className="w-4 h-4 ml-2 group-hover/btn:translate-x-1 transition-transform" />
+              </button>
+            </div>
           </div>
+        ))
+      ) : (
+        <div className="col-span-3 text-center py-16 bg-gradient-to-br from-gray-800/50 to-gray-700/30 backdrop-blur-sm rounded-2xl border border-gray-700/50">
+          <FolderOpen className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-white mb-2">No Projects Yet</h3>
+          <p className="text-gray-400">Projects will appear here once added</p>
         </div>
-      </section>
+      )}
+    </div>
+  </div>
+</section>
 
       {/* ========== CONTACT SECTION ========== */}
       <section className="py-16 px-4 sm:px-6 lg:px-8">
@@ -434,12 +473,11 @@ export default async function HomePage() {
             <p className="text-gray-400">
               © {new Date().getFullYear()} {profile?.fullName || 'Portfolio'}. All rights reserved.
             </p>
-            <p className="text-gray-500 text-sm mt-2">
-              Page generated at: {new Date(timestamp).toLocaleString()}
-            </p>
           </div>
         </div>
       </footer>
     </div>
   );
-}
+};
+
+export default HomePage; 
